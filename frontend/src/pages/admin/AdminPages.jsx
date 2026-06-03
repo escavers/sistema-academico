@@ -275,6 +275,8 @@ export function Pensums() {
   const [subjectAssignments, setSubjectAssignments] = useState({});
   const [subjectSearch, setSubjectSearch] = useState('');
   const [subjectFilter, setSubjectFilter] = useState('all');
+  const [currentPage, setCurrentPage] = useState(1);
+  const SUBJECTS_PER_PAGE = 10;
   const [pensumForm, setPensumForm] = useState({ nombre: '', anio_creacion: '', estado: true });
   const [isPensumModalOpen, setPensumModalOpen] = useState(false);
   const [pensumModalMode, setPensumModalMode] = useState('create');
@@ -390,6 +392,17 @@ export function Pensums() {
       if (aSelected === bSelected) return a.codigo.localeCompare(b.codigo);
       return aSelected ? -1 : 1;
     });
+
+  const totalPages = Math.max(1, Math.ceil(filteredSubjects.length / SUBJECTS_PER_PAGE));
+  const paginatedSubjects = filteredSubjects.slice(
+    (currentPage - 1) * SUBJECTS_PER_PAGE,
+    currentPage * SUBJECTS_PER_PAGE
+  );
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [subjectSearch, subjectFilter, selectedPensumId]);
 
   const openPensumModal = (mode) => {
     setPensumModalMode(mode);
@@ -598,6 +611,7 @@ export function Pensums() {
                   <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                     <span className="badge badge-info">{selectedSubjectIds.length} seleccionadas</span>
                     <span className="badge badge-neutral">{filteredSubjects.length} visibles</span>
+                    <span className="badge badge-primary">Pág. {currentPage}/{totalPages}</span>
                   </div>
                 </div>
                 <div className="table-wrapper" style={{ overflowX: 'auto' }}>
@@ -612,7 +626,7 @@ export function Pensums() {
                       </tr>
                     </thead>
                     <tbody>
-                      {filteredSubjects.map((subject) => {
+                      {paginatedSubjects.map((subject) => {
                         const selected = selectedSubjectIds.includes(subject.id);
                         return (
                           <tr key={subject.id} style={{ background: selected ? 'rgba(99,102,241,0.08)' : 'transparent', cursor: 'pointer' }} onClick={() => toggleSubject(subject.id)}>
@@ -650,6 +664,35 @@ export function Pensums() {
                     </tbody>
                   </table>
                 </div>
+                {/* Pagination controls */}
+                {totalPages > 1 && (
+                  <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 6, marginTop: 16, flexWrap: 'wrap' }}>
+                    <button
+                      className="btn btn-secondary btn-sm"
+                      disabled={currentPage === 1}
+                      onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                    >
+                      ← Anterior
+                    </button>
+                    {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                      <button
+                        key={page}
+                        className={`btn btn-sm ${page === currentPage ? 'btn-primary' : 'btn-secondary'}`}
+                        onClick={() => setCurrentPage(page)}
+                        style={{ minWidth: 36 }}
+                      >
+                        {page}
+                      </button>
+                    ))}
+                    <button
+                      className="btn btn-secondary btn-sm"
+                      disabled={currentPage === totalPages}
+                      onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                    >
+                      Siguiente →
+                    </button>
+                  </div>
+                )}
                 <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, marginTop: 18, alignItems: 'center' }}>
                   <div style={{ color: '#374151' }}>
                     <strong>{selectedSubjectIds.length}</strong> materias seleccionadas • ajusta el semestre y guarda los cambios.
