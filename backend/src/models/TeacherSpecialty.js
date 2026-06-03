@@ -1,39 +1,33 @@
 const { DataTypes } = require('sequelize');
 const sequelize = require('../config/database');
 
-const Subject = sequelize.define('Subject', {
+const TeacherSpecialty = sequelize.define('TeacherSpecialty', {
   id: {
     type: DataTypes.INTEGER,
     primaryKey: true,
     autoIncrement: true,
   },
-  codigo: {
-    type: DataTypes.STRING(20),
-    allowNull: false,
-    unique: true,
-  },
-  nombre: {
-    type: DataTypes.STRING(150),
-    allowNull: false,
-  },
-  creditos: {
+  id_docente: {
     type: DataTypes.INTEGER,
     allowNull: false,
-  },
-  descripcion: {
-    type: DataTypes.TEXT,
-    allowNull: true,
+    references: { model: 'docente', key: 'id' },
+    onUpdate: 'CASCADE',
+    onDelete: 'CASCADE',
   },
   id_carrera: {
     type: DataTypes.INTEGER,
-    allowNull: true,
+    allowNull: false,
     references: { model: 'carrera', key: 'id' },
     onUpdate: 'CASCADE',
-    onDelete: 'SET NULL',
+    onDelete: 'CASCADE',
+  },
+  especialidad: {
+    type: DataTypes.STRING(200),
+    allowNull: false,
   },
 }, {
-  tableName: 'materia',
+  tableName: 'docente_especialidad',
   timestamps: false,
 });
 
-module.exports = Subject;
+module.exports = TeacherSpecialty;

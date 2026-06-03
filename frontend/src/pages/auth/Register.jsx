@@ -41,10 +41,20 @@ export default function Register() {
     matricula: '', telefono: '', fecha_nacimiento: '', id_carrera: '', id_pensum: '',
     // Teacher specific
     especialidad: '',
+    // Teacher carreras (licenciaturas) - array of { id_carrera, licenciatura }
+    carreras: [],
+    // Teacher especialidades por carrera - array of { id_carrera, especialidad }
+    especialidades: [],
   });
   const [careers, setCareers] = useState([]);
   const [allUsers, setAllUsers] = useState([]);
   const [fieldErrors, setFieldErrors] = useState({});
+
+  // Teacher dynamic form helpers
+  const [newCarreraId, setNewCarreraId] = useState('');
+  const [newCarreraLic, setNewCarreraLic] = useState('');
+  const [newEspCarreraId, setNewEspCarreraId] = useState('');
+  const [newEspTexto, setNewEspTexto] = useState('');
 
   const getCurrentPensumId = (career) => {
     if (!career?.pensums?.length) return '';
@@ -67,6 +77,51 @@ export default function Register() {
     }
 
     setForm((p) => ({ ...p, [name]: value }));
+  };
+
+  const addCarrera = () => {
+    if (!newCarreraId || !newCarreraLic.trim()) {
+      show('Selecciona una carrera e ingresa la licenciatura', 'warning');
+      return;
+    }
+    const already = form.carreras.find((c) => c.id_carrera === parseInt(newCarreraId));
+    if (already) {
+      show('Esta carrera ya fue agregada', 'warning');
+      return;
+    }
+    setForm((p) => ({
+      ...p,
+      carreras: [...p.carreras, { id_carrera: parseInt(newCarreraId), licenciatura: newCarreraLic.trim() }],
+    }));
+    setNewCarreraId('');
+    setNewCarreraLic('');
+  };
+
+  const removeCarrera = (id_carrera) => {
+    setForm((p) => ({
+      ...p,
+      carreras: p.carreras.filter((c) => c.id_carrera !== id_carrera),
+      especialidades: p.especialidades.filter((e) => e.id_carrera !== id_carrera),
+    }));
+  };
+
+  const addEspecialidad = () => {
+    if (!newEspCarreraId || !newEspTexto.trim()) {
+      show('Selecciona la carrera e ingresa la especialidad', 'warning');
+      return;
+    }
+    setForm((p) => ({
+      ...p,
+      especialidades: [...p.especialidades, { id_carrera: parseInt(newEspCarreraId), especialidad: newEspTexto.trim() }],
+    }));
+    setNewEspTexto('');
+  };
+
+  const removeEspecialidad = (index) => {
+    setForm((p) => ({
+      ...p,
+      especialidades: p.especialidades.filter((_, i) => i !== index),
+    }));
   };
 
   const validateStep1 = () => {
@@ -145,6 +200,7 @@ export default function Register() {
       if (form.id_rol === 3 && !form.id_carrera) errors.id_carrera = 'Selecciona la carrera del estudiante';
       if (form.id_rol === 3 && !form.matricula) errors.matricula = 'Ingresa la matrícula del estudiante';
       if (form.id_rol === 2 && !form.especialidad) errors.especialidad = 'Ingresa la especialidad del docente';
+      if (form.id_rol === 2 && form.carreras.length === 0) errors.carreras = 'Agrega al menos una carrera (licenciatura) al docente';
 
       if (Object.keys(errors).length > 0) {
         setFieldErrors(errors);
@@ -169,6 +225,8 @@ export default function Register() {
       }
       if (form.id_rol !== 2) {
         delete payload.especialidad;
+        delete payload.carreras;
+        delete payload.especialidades;
       }
 
       await authApi.register(payload);
@@ -181,6 +239,8 @@ export default function Register() {
       setLoading(false);
     }
   };
+
+  const getCareerName = (id) => careers.find((c) => c.id === id)?.nombre || `Carrera #${id}`;
 
   return (
     <div style={{ maxWidth: 800, margin: '0 auto', animation: 'fadeIn 0.3s ease' }}>
@@ -413,16 +473,123 @@ export default function Register() {
 
             {form.id_rol === 2 && (
               <div style={{ animation: 'slideUp 0.2s ease' }}>
+                {/* Especialidad general */}
                 <div className="form-group">
-                  <label className="form-label">Especialidad de Enseñanza <span>*</span></label>
+                  <label className="form-label">Especialidad General <span>*</span></label>
                   <input className="form-control" name="especialidad" placeholder="Ej: Algoritmos, Ingeniería de Software, Álgebra" value={form.especialidad} onChange={handleChange} required />
                   {fieldErrors.especialidad && <div className="text-danger" style={{ marginTop: 6 }}>{fieldErrors.especialidad}</div>}
-                  <span className="form-hint">Especialidad principal del docente en la universidad.</span>
+                  <span className="form-hint">Descripción general de la especialidad del docente.</span>
                 </div>
+
                 <div className="form-group">
                   <label className="form-label">Teléfono de Contacto</label>
                   <input className="form-control" name="telefono" placeholder="Ej: 71234567" value={form.telefono} onChange={handleChange} />
                 </div>
+
+                {/* ── Carreras / Licenciatura ── */}
+                <div className="card" style={{ padding: 16, marginTop: 16, border: '1px solid var(--border)', background: 'var(--bg-surface)' }}>
+                  <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 12, color: 'var(--text-primary)' }}>
+                    🎓 Carreras / Licenciatura <span style={{ color: 'var(--danger)', fontSize: 13 }}>*</span>
+                  </div>
+                  <p className="text-xs text-muted" style={{ marginBottom: 12 }}>
+                    Indica en qué carrera(s) terminó el docente y su licenciatura correspondiente.
+                  </p>
+
+                  {/* List of added carreras */}
+                  {form.carreras.length > 0 && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
+                      {form.carreras.map((c) => (
+                        <div key={c.id_carrera} style={{
+                          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                          padding: '10px 14px', borderRadius: 8, background: 'rgba(99,102,241,0.06)',
+                          border: '1px solid var(--primary)', gap: 12,
+                        }}>
+                          <div>
+                            <div style={{ fontWeight: 600, fontSize: 14 }}>{getCareerName(c.id_carrera)}</div>
+                            <div className="text-xs text-muted">{c.licenciatura}</div>
+                          </div>
+                          <button type="button" className="btn btn-danger btn-sm" onClick={() => removeCarrera(c.id_carrera)} style={{ flexShrink: 0 }}>
+                            ✕
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {fieldErrors.carreras && <div className="text-danger" style={{ marginBottom: 8 }}>{fieldErrors.carreras}</div>}
+
+                  {/* Add new carrera */}
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+                    <div style={{ flex: '1 1 200px' }}>
+                      <label className="form-label" style={{ fontSize: 12 }}>Carrera</label>
+                      <select className="form-control" value={newCarreraId} onChange={(e) => setNewCarreraId(e.target.value)}>
+                        <option value="">Seleccionar carrera...</option>
+                        {careers.filter((c) => !form.carreras.some((fc) => fc.id_carrera === c.id)).map((c) => (
+                          <option key={c.id} value={c.id}>{c.nombre}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div style={{ flex: '1 1 240px' }}>
+                      <label className="form-label" style={{ fontSize: 12 }}>Licenciatura</label>
+                      <input className="form-control" placeholder="Ej: Lic. en Matemáticas Aplicadas" value={newCarreraLic} onChange={(e) => setNewCarreraLic(e.target.value)} />
+                    </div>
+                    <button type="button" className="btn btn-primary btn-sm" onClick={addCarrera} style={{ height: 40, flexShrink: 0 }}>
+                      + Agregar
+                    </button>
+                  </div>
+                </div>
+
+                {/* ── Especialidades por Carrera ── */}
+                {form.carreras.length > 0 && (
+                  <div className="card" style={{ padding: 16, marginTop: 16, border: '1px solid var(--border)', background: 'var(--bg-surface)' }}>
+                    <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 12, color: 'var(--text-primary)' }}>
+                      📋 Especialidades por Carrera
+                    </div>
+                    <p className="text-xs text-muted" style={{ marginBottom: 12 }}>
+                      Define las especialidades del docente por cada carrera asignada.
+                    </p>
+
+                    {/* List of added especialidades */}
+                    {form.especialidades.length > 0 && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 12 }}>
+                        {form.especialidades.map((e, idx) => (
+                          <div key={idx} style={{
+                            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                            padding: '8px 12px', borderRadius: 8, background: 'rgba(34,197,94,0.06)',
+                            border: '1px solid var(--success)', gap: 12,
+                          }}>
+                            <div>
+                              <span className="badge badge-info" style={{ marginRight: 8 }}>{getCareerName(e.id_carrera)}</span>
+                              <span style={{ fontSize: 14 }}>{e.especialidad}</span>
+                            </div>
+                            <button type="button" className="btn btn-danger btn-sm" onClick={() => removeEspecialidad(idx)} style={{ flexShrink: 0 }}>
+                              ✕
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Add new especialidad */}
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+                      <div style={{ flex: '1 1 200px' }}>
+                        <label className="form-label" style={{ fontSize: 12 }}>Carrera</label>
+                        <select className="form-control" value={newEspCarreraId} onChange={(e) => setNewEspCarreraId(e.target.value)}>
+                          <option value="">Seleccionar carrera...</option>
+                          {form.carreras.map((c) => (
+                            <option key={c.id_carrera} value={c.id_carrera}>{getCareerName(c.id_carrera)}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div style={{ flex: '1 1 240px' }}>
+                        <label className="form-label" style={{ fontSize: 12 }}>Especialidad</label>
+                        <input className="form-control" placeholder="Ej: Desarrollo de Software, Cálculo Avanzado" value={newEspTexto} onChange={(e) => setNewEspTexto(e.target.value)} />
+                      </div>
+                      <button type="button" className="btn btn-primary btn-sm" onClick={addEspecialidad} style={{ height: 40, flexShrink: 0 }}>
+                        + Agregar
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 

@@ -44,7 +44,7 @@ export function Careers() {
   const [modalities, setModalities] = useState([]);
   const [loading, setLoading] = useState(true);
   const [modal, setModal] = useState(null);
-  const [form, setForm]   = useState({ codigo: '', nombre: '', descripcion: '', id_modalidad: '' });
+  const [form, setForm]   = useState({ nombre: '', descripcion: '', id_modalidad: '' });
 
   const load = async () => {
     const [careersRes, modalitiesRes] = await Promise.all([
@@ -98,7 +98,7 @@ export function Careers() {
       <div className="card">
         <div className="card-header">
           <div className="card-title">Lista de Carreras</div>
-          <button className="btn btn-primary btn-sm" onClick={() => { setForm({ codigo: '', nombre: '', descripcion: '', id_modalidad: modalities[0]?.id || '' }); setModal({}); }}>+ Nueva Carrera</button>
+          <button className="btn btn-primary btn-sm" onClick={() => { setForm({ nombre: '', descripcion: '', id_modalidad: modalities[0]?.id || '' }); setModal({}); }}>+ Nueva Carrera</button>
         </div>
         {loading ? <div className="flex-center" style={{ padding: 40 }}><div className="spinner" /></div>
           : <div className="table-wrapper">
@@ -127,7 +127,11 @@ export function Careers() {
         <Modal title={modal.id ? 'Editar Carrera' : 'Nueva Carrera'} onClose={() => setModal(null)}
           footer={<><button className="btn btn-secondary" onClick={() => setModal(null)}>Cancelar</button><button className="btn btn-primary" onClick={save}>💾 Guardar</button></>}>
           <div className="form-grid">
-            <div className="form-group"><label className="form-label">Código <span>*</span></label><input className="form-control" value={form.codigo} onChange={(e) => setForm(p => ({ ...p, codigo: e.target.value }))} /></div>
+            {modal.id ? (
+              <div className="form-group"><label className="form-label">Código</label><input className="form-control" value={form.codigo} disabled style={{ opacity: 0.7 }} /><span className="form-hint">El código se genera automáticamente.</span></div>
+            ) : (
+              <div className="form-group"><label className="form-label">Código</label><input className="form-control" value="Se generará automáticamente" disabled style={{ opacity: 0.6, fontStyle: 'italic' }} /></div>
+            )}
             <div className="form-group"><label className="form-label">Modalidad</label>
               <select className="form-control" value={form.id_modalidad} onChange={(e) => setForm(p => ({ ...p, id_modalidad: parseInt(e.target.value) }))} disabled={modalities.length === 0}>
                 <option value="">{modalities.length ? 'Selecciona modalidad' : 'Cargando modalidades...'}</option>
@@ -151,7 +155,7 @@ export function Subjects() {
   const [rows, setRows]   = useState([]);
   const [loading, setLoading] = useState(true);
   const [modal, setModal] = useState(null);
-  const [form, setForm]   = useState({ codigo: '', nombre: '', descripcion: '' });
+  const [form, setForm]   = useState({ nombre: '', descripcion: '', id_carrera: '' });
   const [search, setSearch] = useState('');
   const [careerFilter, setCareerFilter] = useState('');
   const [careers, setCareers] = useState([]);
@@ -193,7 +197,7 @@ export function Subjects() {
         <div className="card-header" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 12 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, width: '100%' }}>
             <div className="card-title">Lista de Materias</div>
-            <button className="btn btn-primary btn-sm" onClick={() => { setForm({ codigo: '', nombre: '', descripcion: '' }); setModal({}); }}>+ Nueva Materia</button>
+            <button className="btn btn-primary btn-sm" onClick={() => { setForm({ nombre: '', descripcion: '', id_carrera: '' }); setModal({}); }}>+ Nueva Materia</button>
           </div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, justifyContent: 'space-between' }}>
             <div className="input-group search-input" style={{ flex: '1 1 320px', minWidth: 240 }}>
@@ -238,6 +242,7 @@ export function Subjects() {
                             codigo: r.codigo,
                             nombre: r.nombre,
                             descripcion: r.descripcion ?? '',
+                            id_carrera: r.id_carrera || r.carrera?.id || '',
                           });
                           setModal({ id: r.id });
                         }}>✏️</button>
@@ -254,7 +259,19 @@ export function Subjects() {
         <Modal title={modal.id ? 'Editar Materia' : 'Nueva Materia'} onClose={() => setModal(null)}
           footer={<><button className="btn btn-secondary" onClick={() => setModal(null)}>Cancelar</button><button className="btn btn-primary" onClick={save}>💾 Guardar</button></>}>
           <div className="form-grid">
-            <div className="form-group"><label className="form-label">Código <span>*</span></label><input className="form-control" value={form.codigo} onChange={(e) => setForm(p => ({ ...p, codigo: e.target.value }))} /></div>
+            {modal.id ? (
+              <div className="form-group"><label className="form-label">Código</label><input className="form-control" value={form.codigo} disabled style={{ opacity: 0.7 }} /><span className="form-hint">El código se genera automáticamente.</span></div>
+            ) : (
+              <div className="form-group"><label className="form-label">Código</label><input className="form-control" value="Se generará automáticamente" disabled style={{ opacity: 0.6, fontStyle: 'italic' }} /></div>
+            )}
+            <div className="form-group"><label className="form-label">Carrera <span>*</span></label>
+              <select className="form-control" value={form.id_carrera} onChange={(e) => setForm(p => ({ ...p, id_carrera: e.target.value ? parseInt(e.target.value) : '' }))}>
+                <option value="">Selecciona una carrera</option>
+                {careers.map((c) => (
+                  <option key={c.id} value={c.id}>{c.nombre}</option>
+                ))}
+              </select>
+            </div>
           </div>
           <div className="form-group"><label className="form-label">Nombre <span>*</span></label><input className="form-control" value={form.nombre} onChange={(e) => setForm(p => ({ ...p, nombre: e.target.value }))} /></div>
           <div className="form-group"><label className="form-label">Descripción</label><textarea className="form-control" rows={3} value={form.descripcion} onChange={(e) => setForm(p => ({ ...p, descripcion: e.target.value }))} /></div>
