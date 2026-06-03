@@ -86,11 +86,21 @@ const changePassword = async (req, res, next) => {
     }
 
     const { currentPassword, newPassword } = req.body;
+    if (!newPassword || newPassword.length < 6) {
+      return res.status(400).json({ message: 'La nueva contraseña debe tener al menos 6 caracteres' });
+    }
+
     const user = await User.findByPk(req.params.id);
     if (!user) return res.status(404).json({ message: 'Usuario no encontrado' });
 
-    const match = await bcrypt.compare(currentPassword, user.contrasena);
-    if (!match) return res.status(401).json({ message: 'Contraseña actual incorrecta' });
+    if (req.user.rol !== 'Administrador') {
+      if (!currentPassword) {
+        return res.status(400).json({ message: 'La contraseña actual es obligatoria' });
+      }
+
+      const match = await bcrypt.compare(currentPassword, user.contrasena);
+      if (!match) return res.status(401).json({ message: 'Contraseña actual incorrecta' });
+    }
 
     const hashed = await bcrypt.hash(newPassword, 10);
     await user.update({ contrasena: hashed });

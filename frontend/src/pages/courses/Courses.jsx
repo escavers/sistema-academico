@@ -8,10 +8,12 @@ export default function Courses() {
   const { user, isAdmin, isTeacher, isStudent } = useAuth();
   const { show } = useToast();
   
-  const [courses, setCourses]       = useState([]);
-  const [profile, setProfile]       = useState(null);
-  const [loading, setLoading]       = useState(true);
-  const [search, setSearch]         = useState('');
+  const [courses, setCourses]             = useState([]);
+  const [profile, setProfile]             = useState(null);
+  const [enrolledCourseIds, setEnrolledCourseIds] = useState([]);
+  const [loading, setLoading]             = useState(true);
+  const [search, setSearch]               = useState('');
+  const [turnoFilter, setTurnoFilter]     = useState('');
   
   const TURNOS = {
     manana: { label: 'Mañana', hora_inicio: '08:00', hora_fin: '12:00' },
@@ -42,12 +44,14 @@ export default function Courses() {
         res = await coursesApi.getByTeacher(user.id);
         setCourses(res.data);
       } else if (isStudent()) {
-        const [profileRes, coursesRes] = await Promise.all([
+        const [profileRes, coursesRes, enrollmentsRes] = await Promise.all([
           authApi.profile(),
           coursesApi.getAll(),
+          enrollmentsApi.getByStudent(user.id),
         ]);
         const studentCareerId = profileRes.data.estudiante?.id_carrera;
         setProfile(profileRes.data);
+        setEnrolledCourseIds((enrollmentsRes.data || []).map((e) => e.curso?.id).filter(Boolean));
 
         const availableCourses = (coursesRes.data || []).filter((c) => {
           const isPeriodActive = c.periodo_academico?.estado === true;
@@ -94,11 +98,33 @@ export default function Courses() {
     loadAdminHelpers();
   }, []);
 
+  const normalizeText = (value) =>
+    String(value || '')
+      .normalize('NFD')
+      .replace(/\p{Diacritic}/gu, '')
+      .toLowerCase();
+
+  const getScheduleTurno = (horario) => {
+    const start = horario?.hora_inicio?.slice(0, 2);
+    if (!start) return null;
+    const hour = Number(start);
+    if (hour >= 8 && hour < 12) return 'manana';
+    if (hour >= 12 && hour < 18) return 'tarde';
+    if (hour >= 18 && hour < 24) return 'noche';
+    return null;
+  };
+
   const filtered = courses.filter((c) => {
-    const matchesSearch = [c.codigo_grupo, c.materia?.nombre, c.materia?.codigo]
-      .join(' ').toLowerCase().includes(search.toLowerCase());
+    const searchable = [c.codigo_grupo, c.materia?.nombre, c.materia?.codigo]
+      .join(' ');
+    const matchesSearch = normalizeText(searchable).includes(normalizeText(search));
 
     if (!matchesSearch) return false;
+    if (turnoFilter) {
+      if (!c.horarios?.some((h) => getScheduleTurno(h) === turnoFilter)) {
+        return false;
+      }
+    }
     if (!isAdmin() || !selectedCareerId) return true;
 
     return c.materia?.pensums?.some((pensum) => pensum.carrera?.id === Number(selectedCareerId));
@@ -251,14 +277,34 @@ export default function Courses() {
               </div>
             )}
           </div>
-          <div className="input-group search-input" style={{ flex: '1 1 320px', minWidth: 260, maxWidth: 520 }}>
-            <span className="input-icon">🔍</span>
-            <input
-              className="form-control"
-              placeholder="Buscar por grupo, materia, código..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
+          <div style={{ display: 'flex', flexWrap: 'nowrap', gap: 12, alignItems: 'center', minWidth: 320, flex: '1 1 auto' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 180, flexShrink: 0 }}>
+              <label htmlFor="turno-filter" style={{ fontSize: 14, color: 'var(--text-secondary)', margin: 0 }}>
+                Turno:
+              </label>
+              <select
+                id="turno-filter"
+                className="form-control"
+                value={turnoFilter}
+                onChange={(e) => setTurnoFilter(e.target.value)}
+                style={{ minWidth: 140 }}
+              >
+                <option value="">Todos los turnos</option>
+                {Object.entries(TURNOS).map(([key, turno]) => (
+                  <option key={key} value={key}>{turno.label}</option>
+                ))}
+              </select>
+            </div>
+            <div className="input-group search-input" style={{ flex: '1 1 1', minWidth: 0, maxWidth: 520 }}>
+              <span className="input-icon">🔍</span>
+              <input
+                className="form-control"
+                placeholder="Buscar por grupo, materia, código..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                style={{ minWidth: 0 }}
+              />
+            </div>
           </div>
         </div>
       </div>
@@ -313,9 +359,13 @@ export default function Courses() {
                 </span>
                 
                 {isStudent() && c.estado && (
-                  <button className="btn btn-primary btn-sm" onClick={() => setEnrollModal(c)}>
-                    + Inscribirme
-                  </button>
+                  enrolledCourseIds.includes(c.id) ? (
+                    <span className="badge badge-primary">Inscrito</span>
+                  ) : (
+                    <button className="btn btn-primary btn-sm" onClick={() => setEnrollModal(c)}>
+                      + Inscribirme
+                    </button>
+                  )
                 )}
 
                 {isAdmin() && (

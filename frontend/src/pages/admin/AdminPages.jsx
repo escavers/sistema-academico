@@ -129,12 +129,18 @@ export function Careers() {
           <div className="form-grid">
             <div className="form-group"><label className="form-label">Código <span>*</span></label><input className="form-control" value={form.codigo} onChange={(e) => setForm(p => ({ ...p, codigo: e.target.value }))} /></div>
             <div className="form-group"><label className="form-label">Modalidad</label>
-              <select className="form-control" value={form.id_modalidad} onChange={(e) => setForm(p => ({ ...p, id_modalidad: parseInt(e.target.value) }))} disabled={modalities.length === 0}>
-                <option value="">{modalities.length ? 'Selecciona modalidad' : 'Cargando modalidades...'}</option>
-                {modalities.map((m) => (
-                  <option key={m.id} value={m.id}>{m.nombre}</option>
-                ))}
-              </select>
+              {modal?.id ? (
+                <div className="form-control" style={{ background: 'var(--bg-input)', borderColor: 'var(--border)', cursor: 'default' }}>
+                  {modalities.find((m) => m.id === form.id_modalidad)?.nombre || 'Sin modalidad'}
+                </div>
+              ) : (
+                <select className="form-control" value={form.id_modalidad} onChange={(e) => setForm(p => ({ ...p, id_modalidad: parseInt(e.target.value) }))} disabled={modalities.length === 0}>
+                  <option value="">{modalities.length ? 'Selecciona modalidad' : 'Cargando modalidades...'}</option>
+                  {modalities.map((m) => (
+                    <option key={m.id} value={m.id}>{m.nombre}</option>
+                  ))}
+                </select>
+              )}
             </div>
           </div>
           <div className="form-group"><label className="form-label">Nombre <span>*</span></label><input className="form-control" value={form.nombre} onChange={(e) => setForm(p => ({ ...p, nombre: e.target.value }))} /></div>
@@ -373,6 +379,23 @@ export function Pensums() {
     });
   };
 
+  const assignVisibleSubjects = () => {
+    setSelectedSubjectIds((prevSelected) => {
+      const visibleIds = filteredSubjects.map((subject) => subject.id);
+      const nextAssignments = { ...subjectAssignments };
+      visibleIds.forEach((subjectId) => {
+        nextAssignments[subjectId] = nextAssignments[subjectId] || 1;
+      });
+      setSubjectAssignments(nextAssignments);
+      return Array.from(new Set([...prevSelected, ...visibleIds]));
+    });
+  };
+
+  const clearSelection = () => {
+    setSelectedSubjectIds([]);
+    setSubjectAssignments({});
+  };
+
   const filteredSubjects = subjects
     .filter((subject) => {
       const q = subjectSearch.trim().toLowerCase();
@@ -404,36 +427,55 @@ export function Pensums() {
     setCurrentPage(1);
   }, [subjectSearch, subjectFilter, selectedPensumId]);
 
+  const getPensumAutoName = (careerCode, year) => {
+    if (!careerCode || !year) return '';
+    return `${careerCode.toUpperCase()} - ${year}`;
+  };
+
+  const YEAR_OPTIONS = Array.from({ length: 7 }, (_, index) => String(new Date().getFullYear() - 2 + index));
+
   const openPensumModal = (mode) => {
     setPensumModalMode(mode);
     setEditingPensumId(mode === 'edit' ? selectedPensumId : null);
     if (mode === 'edit' && selectedPensumId) {
       const current = careerPensums.find((pensum) => pensum.id === selectedPensumId);
+      const career = careers.find((careerItem) => careerItem.id === current?.id_carrera) || selectedCareer;
+      const yearValue = current?.anio_creacion ? current.anio_creacion.slice(0, 4) : '';
       setPensumForm({
-        nombre: current?.nombre || '',
-        anio_creacion: current?.anio_creacion ? current.anio_creacion.slice(0, 10) : '',
+        id_carrera: current?.id_carrera || selectedCareerId,
+        nombre: getPensumAutoName(career?.codigo || '', yearValue),
+        anio_creacion: yearValue,
         estado: current?.estado ?? true,
       });
     } else {
-      setPensumForm({ nombre: '', anio_creacion: '', estado: true });
+      setPensumForm({
+        id_carrera: selectedCareerId || '',
+        nombre: getPensumAutoName(selectedCareer?.codigo || '', ''),
+        anio_creacion: '',
+        estado: true,
+      });
     }
     setPensumModalOpen(true);
   };
 
   const handlePensumSave = async () => {
-    if (!selectedCareerId) {
-      show('Selecciona una carrera primero', 'warning');
-      return;
-    }
-    if (!pensumForm.nombre) {
-      show('El nombre del pensum es obligatorio', 'warning');
+    const careerId = pensumForm.id_carrera || selectedCareerId;
+    if (!careerId) {
+      show('Selecciona una carrera antes de guardar', 'warning');
       return;
     }
 
+    const yearValue = pensumForm.anio_creacion || String(new Date().getFullYear());
+    if (!/^[0-9]{4}$/.test(yearValue)) {
+      show('El año de creación debe tener 4 dígitos', 'warning');
+      return;
+    }
+
+    const career = careers.find((careerItem) => careerItem.id === careerId);
     const payload = {
-      id_carrera: selectedCareerId,
-      nombre: pensumForm.nombre,
-      anio_creacion: pensumForm.anio_creacion || new Date().toISOString().slice(0, 10),
+      id_carrera: careerId,
+      nombre: getPensumAutoName(career?.codigo || '', yearValue),
+      anio_creacion: `${yearValue}-01-01`,
       estado: pensumForm.estado,
     };
 
@@ -487,9 +529,14 @@ export function Pensums() {
     <>
       <div className="page-header"><h1>Pensums</h1><p>Administra los planes de estudio por carrera y organiza las materias por semestre.</p></div>
       <div className="card">
-        <div className="card-header">
-          <div className="card-title">Administrar Pensums</div>
-          <div className="card-description">Selecciona una carrera, edita el pensum y asigna las materias con su semestre.</div>
+        <div className="card-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
+          <div>
+            <div className="card-title">Administrar Pensums</div>
+            <div className="card-description">Selecciona una carrera, edita el pensum y asigna las materias con su semestre.</div>
+          </div>
+          <button className="btn btn-primary btn-sm" onClick={() => openPensumModal('create')}>
+            + Crear Pensum
+          </button>
         </div>
         {loading ? (
           <div className="flex-center" style={{ padding: 40 }}><div className="spinner" /></div>
@@ -497,76 +544,79 @@ export function Pensums() {
           <div className="card-body" style={{ display: 'grid', gap: 20 }}>
             <div className="grid-2" style={{ gap: 20 }}>
               <div className="card" style={{ padding: 18 }}>
-                <div className="card-title">Selección</div>
-                <div className="form-group">
-                  <label className="form-label">Carrera</label>
-                  <select className="form-control" value={selectedCareer?.id || ''} onChange={(e) => setSelectedCareerId(Number(e.target.value))}>
-                    {careers.map((career) => (
-                      <option key={career.id} value={career.id}>{career.nombre}</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Pensum</label>
-                  {careerPensums.length === 0 ? (
-                    <div>
+                <div className="card-title">Selección del Pensum</div>
+                <div style={{ display: 'grid', gap: 16 }}>
+                  <div className="form-group">
+                    <label className="form-label">Carrera</label>
+                    <select
+                      className="form-control"
+                      value={selectedCareer?.id || ''}
+                      onChange={(e) => setSelectedCareerId(Number(e.target.value))}
+                    >
+                      {careers.map((career) => (
+                        <option key={career.id} value={career.id}>{career.nombre}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">Pensums disponibles</label>
+                    {careerPensums.length === 0 ? (
                       <div className="text-muted" style={{ padding: '14px 12px', border: '1px solid var(--border)', borderRadius: 8, background: 'var(--bg-card)' }}>
                         Esta carrera aún no tiene un pensum.
                       </div>
-                      <button className="btn btn-secondary btn-sm" onClick={() => openPensumModal('create')} style={{ marginTop: 12 }}>
-                        + Crear Pensum
-                      </button>
-                    </div>
-                  ) : (
-                    <select className="form-control" value={selectedPensumId || ''} onChange={(e) => setSelectedPensumId(Number(e.target.value))}>
-                      {careerPensums.map((pensum) => (
-                        <option key={pensum.id} value={pensum.id}>
-                          {pensum.nombre || 'Sin nombre'} — {pensum.anio_creacion || 'Sin fecha'}
-                        </option>
-                      ))}
-                    </select>
-                  )}
-                </div>
-                <div className="card" style={{ padding: 16, background: 'var(--bg-card)', marginTop: 12, border: '1px solid var(--border)' }}>
-                  <div className="card-title">Detalles del Pensum</div>
-                  <div style={{ display: 'grid', gap: 10, marginTop: 8 }}>
-                    <div><strong>Nombre:</strong> {pensumForm.nombre || 'Sin pensum seleccionado'}</div>
-                    <div><strong>Creación:</strong> {pensumForm.anio_creacion || '—'}</div>
-                    <div><strong>Estado:</strong> {pensumForm.estado ? 'Activo' : 'Inactivo'}</div>
+                    ) : (
+                      <select
+                        className="form-control"
+                        value={selectedPensumId || ''}
+                        onChange={(e) => setSelectedPensumId(Number(e.target.value))}
+                      >
+                        <option value="">Selecciona un pensum</option>
+                        {careerPensums.map((pensum) => (
+                          <option key={pensum.id} value={pensum.id}>
+                            {pensum.nombre || 'Pensum sin nombre'} — {pensum.anio_creacion || 'Sin fecha'} {pensum.estado ? '(Activo)' : '(Inactivo)'}
+                          </option>
+                        ))}
+                      </select>
+                    )}
                   </div>
-                </div>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginTop: 16 }}>
-                  <button className="btn btn-primary btn-sm" onClick={() => openPensumModal('create')}>
-                    + Crear Pensum
-                  </button>
-                  {selectedPensumId && (
-                    <button className="btn btn-secondary btn-sm" onClick={() => openPensumModal('edit')}>
-                      ✏️ Editar Pensum
-                    </button>
-                  )}
+
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginTop: 10 }}>
+                    {selectedPensumId && (
+                      <button className="btn btn-secondary btn-sm" onClick={() => openPensumModal('edit')}>
+                        ✏️ Editar Pensum
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
 
               <div className="card" style={{ padding: 18, background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
-                <div className="card-title">Resumen</div>
-                <div style={{ display: 'grid', gap: 10 }}>
-                  <div style={{ fontSize: 14, color: '#4b5563' }}>Carrera seleccionada</div>
-                  <div style={{ fontWeight: 700 }}>{selectedCareer?.nombre || '—'}</div>
-                  <div style={{ fontSize: 14, color: '#4b5563' }}>Pensums disponibles</div>
-                  <div style={{ fontWeight: 700 }}>{careerPensums.length}</div>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 8, marginTop: 6 }}>
+                <div className="card-title">Resumen rápido</div>
+                <div style={{ display: 'grid', gap: 12, marginTop: 10 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+                    <div>
+                      <div style={{ fontSize: 14, color: '#4b5563' }}>Carrera</div>
+                      <div style={{ fontWeight: 700 }}>{selectedCareer?.nombre || '—'}</div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 14, color: '#4b5563' }}>Pensums</div>
+                      <div style={{ fontWeight: 700 }}>{careerPensums.length}</div>
+                    </div>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 8 }}>
                     <span className="badge badge-success">Activos: {activePensumsCount}</span>
                     <span className="badge badge-neutral">Cerrados: {inactivePensumsCount}</span>
                   </div>
-                  {selectedPensumId ? (
-                    <>
-                      <div style={{ fontSize: 14, color: '#4b5563' }}>Pensum actual</div>
+                  {selectedPensumId && (
+                    <div style={{ display: 'grid', gap: 8 }}>
+                      <div style={{ fontSize: 14, color: '#4b5563' }}>Pensum seleccionado</div>
                       <div style={{ fontWeight: 700 }}>{careerPensums.find((p) => p.id === selectedPensumId)?.nombre || '—'}</div>
-                    </>
-                  ) : null}
-                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
-                    <span className="badge badge-info">Materias asignadas: {selectedSubjectIds.length}</span>
-                    <span className="badge badge-neutral">Semestre ajustable</span>
+                    </div>
+                  )}
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                    <span className="badge badge-info">Asignadas: {selectedSubjectIds.length}</span>
+                    <span className="badge badge-neutral">Semestre editable</span>
                   </div>
                 </div>
               </div>
@@ -578,37 +628,47 @@ export function Pensums() {
                 <p style={{ margin: '8px 0 16px', color: '#6b7280' }}>
                   Busca y selecciona las materias para este pensum. Haz clic en la fila para asignar o desasignar, y ajusta el semestre únicamente en las materias seleccionadas.
                 </p>
-                <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 14, alignItems: 'center' }}>
-                  <div className="input-group search-input" style={{ flex: '1 1 320px', minWidth: 220 }}>
-                    <span className="input-icon">🔍</span>
-                    <input
-                      className="form-control"
-                      placeholder="Buscar materias por código o nombre..."
-                      value={subjectSearch}
-                      onChange={(e) => setSubjectSearch(e.target.value)}
-                    />
+                <div style={{ display: 'grid', gap: 12, marginBottom: 14 }}>
+                  <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+                    <div className="input-group search-input" style={{ flex: '1 1 320px', minWidth: 220 }}>
+                      <span className="input-icon">🔍</span>
+                      <input
+                        className="form-control"
+                        placeholder="Buscar materias por código o nombre..."
+                        value={subjectSearch}
+                        onChange={(e) => setSubjectSearch(e.target.value)}
+                      />
+                    </div>
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                      <button
+                        className={`btn btn-sm ${subjectFilter === 'all' ? 'btn-primary' : 'btn-secondary'}`}
+                        onClick={() => setSubjectFilter('all')}
+                      >
+                        Todas
+                      </button>
+                      <button
+                        className={`btn btn-sm ${subjectFilter === 'assigned' ? 'btn-primary' : 'btn-secondary'}`}
+                        onClick={() => setSubjectFilter('assigned')}
+                      >
+                        Asignadas
+                      </button>
+                      <button
+                        className={`btn btn-sm ${subjectFilter === 'unassigned' ? 'btn-primary' : 'btn-secondary'}`}
+                        onClick={() => setSubjectFilter('unassigned')}
+                      >
+                        Sin asignar
+                      </button>
+                    </div>
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginLeft: 'auto', alignItems: 'center' }}>
+                      <button className="btn btn-secondary btn-sm" onClick={assignVisibleSubjects}>
+                        Asignar visibles
+                      </button>
+                      <button className="btn btn-secondary btn-sm" onClick={clearSelection}>
+                        Deseleccionar todo
+                      </button>
+                    </div>
                   </div>
-                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                    <button
-                      className={`btn btn-sm ${subjectFilter === 'all' ? 'btn-primary' : 'btn-secondary'}`}
-                      onClick={() => setSubjectFilter('all')}
-                    >
-                      Todas
-                    </button>
-                    <button
-                      className={`btn btn-sm ${subjectFilter === 'assigned' ? 'btn-primary' : 'btn-secondary'}`}
-                      onClick={() => setSubjectFilter('assigned')}
-                    >
-                      Asignadas
-                    </button>
-                    <button
-                      className={`btn btn-sm ${subjectFilter === 'unassigned' ? 'btn-primary' : 'btn-secondary'}`}
-                      onClick={() => setSubjectFilter('unassigned')}
-                    >
-                      Sin asignar
-                    </button>
-                  </div>
-                  <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
                     <span className="badge badge-info">{selectedSubjectIds.length} seleccionadas</span>
                     <span className="badge badge-neutral">{filteredSubjects.length} visibles</span>
                     <span className="badge badge-primary">Pág. {currentPage}/{totalPages}</span>
@@ -729,12 +789,54 @@ export function Pensums() {
           }
         >
           <div className="form-group">
-            <label className="form-label">Nombre del pensum</label>
-            <input className="form-control" value={pensumForm.nombre} onChange={(e) => setPensumForm((p) => ({ ...p, nombre: e.target.value }))} />
+            <label className="form-label">Carrera</label>
+            <select
+              className="form-control"
+              value={pensumForm.id_carrera || ''}
+              disabled={pensumModalMode === 'edit'}
+              onChange={(e) => {
+                const careerId = Number(e.target.value);
+                const career = careers.find((careerItem) => careerItem.id === careerId);
+                setPensumForm((p) => ({
+                  ...p,
+                  id_carrera: careerId,
+                  nombre: getPensumAutoName(career?.codigo || '', p.anio_creacion),
+                }));
+              }}
+            >
+              <option value="">Selecciona una carrera</option>
+              {careers.map((career) => (
+                <option key={career.id} value={career.id}>{career.nombre}</option>
+              ))}
+            </select>
           </div>
           <div className="form-group">
             <label className="form-label">Año de creación</label>
-            <input type="date" className="form-control" value={pensumForm.anio_creacion} onChange={(e) => setPensumForm((p) => ({ ...p, anio_creacion: e.target.value }))} />
+            <select
+              className="form-control"
+              value={pensumForm.anio_creacion}
+              onChange={(e) => {
+                const year = e.target.value;
+                const career = careers.find((careerItem) => careerItem.id === pensumForm.id_carrera);
+                setPensumForm((p) => ({
+                  ...p,
+                  anio_creacion: year,
+                  nombre: getPensumAutoName(career?.codigo || '', year),
+                }));
+              }}
+            >
+              <option value="">Selecciona un año</option>
+              {YEAR_OPTIONS.map((year) => (
+                <option key={year} value={year}>{year}</option>
+              ))}
+            </select>
+          </div>
+          <div className="form-group">
+            <label className="form-label">Nombre del pensum</label>
+            <input className="form-control" value={pensumForm.nombre} readOnly />
+            <div className="form-hint" style={{ marginTop: 6, color: 'var(--text-secondary)' }}>
+              Se genera automáticamente como código de carrera + año, por ejemplo: SIS - 2025.
+            </div>
           </div>
           <div className="form-group" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <input type="checkbox" id="modal-pensum-estado" checked={pensumForm.estado} onChange={(e) => setPensumForm((p) => ({ ...p, estado: e.target.checked }))} />

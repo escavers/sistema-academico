@@ -7,6 +7,21 @@ import Modal from '../../components/Modal';
 const ROLES = { 1: 'Administrador', 2: 'Docente', 3: 'Estudiante' };
 const ROLE_BADGE = { 1: 'badge-warning', 2: 'badge-info', 3: 'badge-primary' };
 
+const EyeIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+    <circle cx="12" cy="12" r="3" />
+  </svg>
+);
+
+const EyeOffIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M17.94 17.94A10.94 10.94 0 0 1 12 20c-7 0-11-8-11-8a21.41 21.41 0 0 1 5.06-6.94" />
+    <path d="M1 1l22 22" />
+    <path d="M9.88 9.88A3 3 0 0 0 12 15a3 3 0 0 0 3.12-3.12" />
+  </svg>
+);
+
 export default function Users() {
   const { show } = useToast();
   const navigate = useNavigate();
@@ -15,8 +30,14 @@ export default function Users() {
   const [search, setSearch]     = useState('');
   const [roleFilter, setRoleFilter] = useState('');
   const [stateFilter, setStateFilter] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 10;
   const [roleModal, setRoleModal] = useState(null); // { userId, id_rol }
   const [editModal, setEditModal] = useState(null); // { userId, nombres, apellido_paterno, apellido_materno, email }
+  const [passwordModal, setPasswordModal] = useState(null); // { userId, nombres, id_rol }
+  const [passwordForm, setPasswordForm] = useState({ newPassword: '' });
+  const [passwordError, setPasswordError] = useState('');
+  const [showNewPassword, setShowNewPassword] = useState(false);
 
   const load = async () => {
     try { 
@@ -69,6 +90,44 @@ export default function Users() {
     }
   };
 
+  const generateGenericPassword = () => {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';
+    return Array.from({ length: 10 }, () => chars.charAt(Math.floor(Math.random() * chars.length))).join('');
+  };
+
+  const openPasswordModal = (user) => {
+    setPasswordModal({ userId: user.id, nombres: `${user.nombres} ${user.apellido_paterno}`, id_rol: user.id_rol });
+    setPasswordForm({ newPassword: generateGenericPassword() });
+    setPasswordError('');
+    setShowNewPassword(false);
+  };
+
+  const handlePasswordChange = (e) => {
+    const { value } = e.target;
+    setPasswordForm({ newPassword: value });
+  };
+
+  const savePassword = async () => {
+    if (!passwordModal) return;
+    if (!passwordForm.newPassword) {
+      setPasswordError('Ingresa una nueva contraseña');
+      return;
+    }
+    if (passwordForm.newPassword.length < 6) {
+      setPasswordError('La contraseña debe tener al menos 6 caracteres');
+      return;
+    }
+
+    try {
+      await usersApi.changePassword(passwordModal.userId, { newPassword: passwordForm.newPassword });
+      show('Contraseña restablecida correctamente ✅', 'success');
+      setPasswordModal(null);
+      load();
+    } catch (err) {
+      setPasswordError(err.response?.data?.message || 'Error al restablecer la contraseña');
+    }
+  };
+
   const filtered = users.filter((u) => {
     const q = search.trim().toLowerCase();
     const matchesSearch = !q || [u.nombres, u.apellido_paterno, u.nombre_usuario, u.email]
@@ -79,7 +138,14 @@ export default function Users() {
     return matchesSearch && matchesRole && matchesState;
   });
 
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const pageUsers = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+
   useEffect(() => { load(); }, []);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, roleFilter, stateFilter]);
 
   const handleDeactivate = async (id) => {
     if (!confirm('¿Estás seguro de que deseas desactivar este usuario? No podrá iniciar sesión.')) return;
@@ -138,8 +204,9 @@ export default function Users() {
             <p>No se encontraron cuentas que coincidan con la búsqueda.</p>
           </div>
         ) : (
-          <div className="table-wrapper">
-            <table className="table">
+          <>
+            <div className="table-wrapper">
+              <table className="table">
               <thead>
                 <tr>
                   <th>Usuario / Cuenta</th>
@@ -150,7 +217,7 @@ export default function Users() {
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((u) => (
+                {pageUsers.map((u) => (
                   <tr key={u.id}>
                     <td>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -200,6 +267,15 @@ export default function Users() {
                         >
                           🎭 Rol
                         </button>
+                        {(u.id_rol === 2 || u.id_rol === 3) && (
+                          <button
+                            className="btn btn-secondary btn-sm"
+                            onClick={() => openPasswordModal(u)}
+                            title="Restablecer contraseña"
+                          >
+                            🔐 Reset
+                          </button>
+                        )}
                         {u.estado ? (
                           <button 
                             className="btn btn-danger btn-sm" 
@@ -224,8 +300,83 @@ export default function Users() {
               </tbody>
             </table>
           </div>
+          <div className="table-footer" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, padding: '14px 18px', borderTop: '1px solid var(--border)', background: 'var(--bg-secondary)' }}>
+            <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>
+              Mostrando {Math.min((currentPage - 1) * pageSize + 1, filtered.length)} - {Math.min(currentPage * pageSize, filtered.length)} de {filtered.length} usuarios
+            </div>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <button
+                className="btn btn-secondary btn-sm"
+                onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+                disabled={currentPage === 1}
+              >
+                ← Anterior
+              </button>
+              <button
+                className="btn btn-secondary btn-sm"
+                onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+                disabled={currentPage === totalPages}
+              >
+                Siguiente →
+              </button>
+            </div>
+          </div>
+          </>
         )}
       </div>
+
+      {passwordModal && (
+        <Modal
+          title="Restablecer Contraseña"
+          onClose={() => setPasswordModal(null)}
+          footer={
+            <>
+              <button className="btn btn-secondary" onClick={() => setPasswordModal(null)}>Cancelar</button>
+              <button className="btn btn-primary" onClick={savePassword}>🔒 Restablecer</button>
+            </>
+          }
+        >
+          <div style={{ marginBottom: 16 }}>
+            <p className="text-sm text-secondary" style={{ marginBottom: 16 }}>
+              Restablece la contraseña del usuario {passwordModal?.nombres}. Utiliza una contraseña temporal segura para que pueda iniciar sesión.
+            </p>
+            <div className="form-group">
+              <label className="form-label">Contraseña Generada <span>*</span></label>
+              <div style={{ position: 'relative' }}>
+                <input
+                  className="form-control"
+                  type={showNewPassword ? 'text' : 'password'}
+                  name="newPassword"
+                  value={passwordForm.newPassword}
+                  onChange={handlePasswordChange}
+                  placeholder="Contraseña generada automáticamente"
+                  style={{ paddingRight: 90 }}
+                />
+                <button
+                  type="button"
+                  className="btn btn-tertiary"
+                  onClick={() => setShowNewPassword((prev) => !prev)}
+                  style={{
+                    position: 'absolute',
+                    right: 8,
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    padding: '6px 10px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    minWidth: 34,
+                    color: 'var(--text-primary)',
+                  }}
+                >
+                  {showNewPassword ? <EyeOffIcon /> : <EyeIcon />}
+                </button>
+              </div>
+            </div>
+            {passwordError && <div className="text-danger" style={{ marginTop: 6 }}>{passwordError}</div>}
+          </div>
+        </Modal>
+      )}
 
       {roleModal && (
         <Modal
