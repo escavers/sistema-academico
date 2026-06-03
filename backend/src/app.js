@@ -22,6 +22,7 @@ const curriculumRoutes = require('./routes/curriculum.routes');
 const academicPeriodRoutes = require('./routes/academicPeriod.routes');
 const reportRoutes = require('./routes/report.routes');
 const modalityRoutes = require('./routes/modality.routes');
+const teacherRoutes = require('./routes/teacher.routes');
 
 const app = express();
 
@@ -72,6 +73,7 @@ app.use('/api/pensums', curriculumRoutes);
 app.use('/api/academic-periods', academicPeriodRoutes);
 app.use('/api/modalities', modalityRoutes);
 app.use('/api/reports', reportRoutes);
+app.use('/api/teachers', teacherRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

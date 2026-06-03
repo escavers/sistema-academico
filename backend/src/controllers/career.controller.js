@@ -1,5 +1,19 @@
 const { Career, Modality, Curriculum, Subject } = require('../models');
 
+/**
+ * Generate auto code from name: first 3 uppercase letters + "-" + padded id
+ */
+const generateCareerCode = async (nombre) => {
+  const prefix = nombre
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // remove accents
+    .replace(/[^a-zA-Z]/g, '')
+    .substring(0, 3)
+    .toUpperCase();
+  const lastCareer = await Career.findOne({ order: [['id', 'DESC']] });
+  const nextId = (lastCareer?.id || 0) + 1;
+  return `${prefix || 'CAR'}-${String(nextId).padStart(3, '0')}`;
+};
+
 const getAll = async (req, res, next) => {
   try {
     const careers = await Career.findAll({
@@ -34,7 +48,11 @@ const getById = async (req, res, next) => {
 
 const create = async (req, res, next) => {
   try {
-    const { codigo, nombre, descripcion, id_modalidad } = req.body;
+    const { nombre, descripcion, id_modalidad } = req.body;
+
+    // Auto-generate code
+    const codigo = await generateCareerCode(nombre || 'CAR');
+
     const career = await Career.create({ codigo, nombre, descripcion, id_modalidad });
     await Curriculum.create({
       anio_creacion: new Date().toISOString().slice(0, 10),

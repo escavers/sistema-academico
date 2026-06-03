@@ -1,7 +1,7 @@
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const { Op, fn, col, where } = require('sequelize');
-const { User, Role, Student, Teacher, Admin, BlacklistedToken, Career, Curriculum } = require('../models');
+const { User, Role, Student, Teacher, Admin, BlacklistedToken, Career, Curriculum, TeacherCareer, TeacherSpecialty } = require('../models');
 const { JWT_SECRET } = require('../middlewares/auth.middleware');
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '24h';
 
@@ -12,6 +12,8 @@ const register = async (req, res, next) => {
       nombre_usuario, contrasena, id_rol,
       matricula, telefono, fecha_nacimiento,
       especialidad, id_carrera, id_pensum,
+      // New fields for teacher
+      carreras, especialidades,
     } = req.body;
 
     if (!nombres || !apellido_paterno || !email || !nombre_usuario || !contrasena || !id_rol) {
@@ -59,6 +61,9 @@ const register = async (req, res, next) => {
     if ((Number(id_rol) === 2) && !especialidad) {
       return res.status(400).json({ message: 'La especialidad es obligatoria para docentes' });
     }
+    if ((Number(id_rol) === 2) && (!Array.isArray(carreras) || carreras.length === 0)) {
+      return res.status(400).json({ message: 'Debe asignar al menos una carrera (licenciatura) al docente' });
+    }
 
     const hashed = await bcrypt.hash(contrasena, 10);
 
@@ -89,6 +94,28 @@ const register = async (req, res, next) => {
       await Student.create({ id: user.id, matricula, telefono, fecha_nacimiento, id_carrera, id_pensum });
     } else if (Number(id_rol) === 2) {
       await Teacher.create({ id: user.id, especialidad, telefono });
+
+      // Create teacher-career relationships with licenciatura
+      if (Array.isArray(carreras) && carreras.length > 0) {
+        await Promise.all(carreras.map((c) =>
+          TeacherCareer.create({
+            id_docente: user.id,
+            id_carrera: c.id_carrera,
+            licenciatura: c.licenciatura || null,
+          })
+        ));
+      }
+
+      // Create teacher specialties per career
+      if (Array.isArray(especialidades) && especialidades.length > 0) {
+        await Promise.all(especialidades.map((e) =>
+          TeacherSpecialty.create({
+            id_docente: user.id,
+            id_carrera: e.id_carrera,
+            especialidad: e.especialidad,
+          })
+        ));
+      }
     } else if (Number(id_rol) === 1) {
       await Admin.create({ id: user.id });
     }
@@ -182,7 +209,13 @@ const getProfile = async (req, res, next) => {
       include: [
         { model: Role, as: 'rol' },
         { model: Student, as: 'estudiante', required: false },
-        { model: Teacher, as: 'docente', required: false },
+        {
+          model: Teacher, as: 'docente', required: false,
+          include: [
+            { model: TeacherCareer, as: 'docenteCarreras', include: [{ model: Career, as: 'carrera' }] },
+            { model: TeacherSpecialty, as: 'especialidades', include: [{ model: Career, as: 'carrera' }] },
+          ],
+        },
         { model: Admin, as: 'administrador', required: false },
       ],
       attributes: { exclude: ['contrasena'] },

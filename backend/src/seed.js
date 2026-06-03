@@ -22,6 +22,8 @@ const {
   Schedule,
   Enrollment,
   Grade,
+  TeacherCareer,
+  TeacherSpecialty,
 } = require('./models');
 
 const createIfNotExist = async (Model, where, defaults) => {
@@ -137,6 +139,13 @@ const run = async () => {
       pensums[item.careerCode] = pensum;
     }
 
+    // Map career codes to career IDs for subject id_carrera linking
+    const careerCodeToId = {
+      'ING-001': careers['ING-001'].id,
+      'ELEC-001': careers['ELEC-001'].id,
+      'ADM-001': careers['ADM-001'].id,
+    };
+
     const subjectsByCareer = {
       'ING-001': [
         { codigo: 'MAT101', nombre: 'Matemáticas I', creditos: 4, descripcion: 'Fundamentos de matemáticas para ingeniería', semestre: 1 },
@@ -166,7 +175,13 @@ const run = async () => {
           nombre: subjectData.nombre,
           creditos: subjectData.creditos,
           descripcion: subjectData.descripcion,
+          id_carrera: careerCodeToId[careerCode],
         });
+
+        // Also update id_carrera if the subject already existed without it
+        if (!subject.id_carrera) {
+          await subject.update({ id_carrera: careerCodeToId[careerCode] });
+        }
 
         await createIfNotExist(SubjectCurriculum, {
           id_pensum: pensums[careerCode].id,
@@ -204,10 +219,22 @@ const run = async () => {
     });
 
     const teacherUsersData = [
-      { nombres: 'Juan', apellido_paterno: 'Pérez', apellido_materno: 'Docente', email: 'juan.perez@sistema.com', nombre_usuario: 'docente1', contrasena: 'Docente123', especialidad: 'Matemáticas' },
-      { nombres: 'María', apellido_paterno: 'Gómez', apellido_materno: 'Docente', email: 'maria.gomez@sistema.com', nombre_usuario: 'docente2', contrasena: 'Docente123', especialidad: 'Electrónica' },
-      { nombres: 'Carlos', apellido_paterno: 'Ruiz', apellido_materno: 'Docente', email: 'carlos.ruiz@sistema.com', nombre_usuario: 'docente3', contrasena: 'Docente123', especialidad: 'Administración' },
-      { nombres: 'Laura', apellido_paterno: 'Sánchez', apellido_materno: 'Docente', email: 'laura.sanchez@sistema.com', nombre_usuario: 'docente4', contrasena: 'Docente123', especialidad: 'Programación' },
+      { nombres: 'Juan', apellido_paterno: 'Pérez', apellido_materno: 'Docente', email: 'juan.perez@sistema.com', nombre_usuario: 'docente1', contrasena: 'Docente123', especialidad: 'Matemáticas',
+        carreras: [{ careerCode: 'ING-001', licenciatura: 'Lic. en Matemáticas Aplicadas' }],
+        especialidades: [{ careerCode: 'ING-001', especialidad: 'Cálculo y Álgebra Lineal' }, { careerCode: 'ING-001', especialidad: 'Física Mecánica' }],
+      },
+      { nombres: 'María', apellido_paterno: 'Gómez', apellido_materno: 'Docente', email: 'maria.gomez@sistema.com', nombre_usuario: 'docente2', contrasena: 'Docente123', especialidad: 'Electrónica',
+        carreras: [{ careerCode: 'ELEC-001', licenciatura: 'Ing. Electrónica' }],
+        especialidades: [{ careerCode: 'ELEC-001', especialidad: 'Circuitos y Electrónica Analógica' }, { careerCode: 'ELEC-001', especialidad: 'Señales y Sistemas' }],
+      },
+      { nombres: 'Carlos', apellido_paterno: 'Ruiz', apellido_materno: 'Docente', email: 'carlos.ruiz@sistema.com', nombre_usuario: 'docente3', contrasena: 'Docente123', especialidad: 'Administración',
+        carreras: [{ careerCode: 'ADM-001', licenciatura: 'Lic. en Administración de Empresas' }],
+        especialidades: [{ careerCode: 'ADM-001', especialidad: 'Gestión Empresarial' }, { careerCode: 'ADM-001', especialidad: 'Marketing Estratégico' }],
+      },
+      { nombres: 'Laura', apellido_paterno: 'Sánchez', apellido_materno: 'Docente', email: 'laura.sanchez@sistema.com', nombre_usuario: 'docente4', contrasena: 'Docente123', especialidad: 'Programación',
+        carreras: [{ careerCode: 'ING-001', licenciatura: 'Ing. de Sistemas' }, { careerCode: 'ELEC-001', licenciatura: 'Ing. Electrónica (Minor)' }],
+        especialidades: [{ careerCode: 'ING-001', especialidad: 'Desarrollo de Software' }, { careerCode: 'ELEC-001', especialidad: 'Programación de Microcontroladores' }],
+      },
     ];
 
     const teachers = [];
@@ -226,6 +253,41 @@ const run = async () => {
         },
       });
       teachers.push(teacherUser);
+
+      // Create teacher-career relationships (licenciatura)
+      if (teacherData.carreras) {
+        for (const careerLink of teacherData.carreras) {
+          await createIfNotExist(TeacherCareer, {
+            id_docente: teacherUser.id,
+            id_carrera: careers[careerLink.careerCode].id,
+          }, {
+            id_docente: teacherUser.id,
+            id_carrera: careers[careerLink.careerCode].id,
+            licenciatura: careerLink.licenciatura,
+          });
+        }
+      }
+
+      // Create teacher specialties per career
+      if (teacherData.especialidades) {
+        for (const specData of teacherData.especialidades) {
+          const existing = await TeacherSpecialty.findOne({
+            where: {
+              id_docente: teacherUser.id,
+              id_carrera: careers[specData.careerCode].id,
+              especialidad: specData.especialidad,
+            },
+          });
+          if (!existing) {
+            await TeacherSpecialty.create({
+              id_docente: teacherUser.id,
+              id_carrera: careers[specData.careerCode].id,
+              especialidad: specData.especialidad,
+            });
+            console.log(`Created specialty for ${teacherData.nombre_usuario}: ${specData.especialidad}`);
+          }
+        }
+      }
     }
 
     const studentUsersData = [

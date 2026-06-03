@@ -42,15 +42,22 @@ export const usersApi = {
   assignRole:     (id, data) => api.put(`/users/${id}/role`, data),
 };
 
+// ── Teachers ──────────────────────────────────
+export const teachersApi = {
+  getAll:  ()   => api.get('/teachers'),
+  getById: (id) => api.get(`/teachers/${id}`),
+};
+
 // ── Courses ───────────────────────────────────
 export const coursesApi = {
-  getAll:       ()              => api.get('/courses'),
-  getById:      (id)            => api.get(`/courses/${id}`),
-  create:       (data)          => api.post('/courses', data),
-  update:       (id, data)      => api.put(`/courses/${id}`, data),
-  delete:       (id)            => api.delete(`/courses/${id}`),
-  getByTeacher: (teacherId)     => api.get(`/courses/teacher/${teacherId}`),
-  getByStudent: (studentId)     => api.get(`/courses/student/${studentId}`),
+  getAll:              ()              => api.get('/courses'),
+  getById:             (id)            => api.get(`/courses/${id}`),
+  create:              (data)          => api.post('/courses', data),
+  update:              (id, data)      => api.put(`/courses/${id}`, data),
+  delete:              (id)            => api.delete(`/courses/${id}`),
+  getByTeacher:        (teacherId)     => api.get(`/courses/teacher/${teacherId}`),
+  getByStudent:        (studentId)     => api.get(`/courses/student/${studentId}`),
+  getAvailableTeachers:(params)        => api.get('/courses/available-teachers', { params }),
 };
 
 // ── Enrollments ───────────────────────────────

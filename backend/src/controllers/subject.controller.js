@@ -1,5 +1,19 @@
 const { Subject, Curriculum, Career, Modality, SubjectCurriculum } = require('../models');
 
+/**
+ * Generate auto code from name: first 3 uppercase letters + "-" + padded id
+ */
+const generateSubjectCode = async (nombre) => {
+  const prefix = nombre
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // remove accents
+    .replace(/[^a-zA-Z]/g, '')
+    .substring(0, 3)
+    .toUpperCase();
+  const lastSubject = await Subject.findOne({ order: [['id', 'DESC']] });
+  const nextId = (lastSubject?.id || 0) + 1;
+  return `${prefix || 'MAT'}-${String(nextId).padStart(3, '0')}`;
+};
+
 const getAll = async (req, res, next) => {
   try {
     const subjects = await Subject.findAll({
@@ -10,6 +24,7 @@ const getAll = async (req, res, next) => {
           through: { attributes: ['semestre'] },
           include: [{ model: Career, as: 'carrera', include: [{ model: Modality, as: 'modalidad' }] }],
         },
+        { model: Career, as: 'carrera' },
       ],
     });
     res.json(subjects);
@@ -28,6 +43,7 @@ const getById = async (req, res, next) => {
           through: { attributes: ['semestre'] },
           include: [{ model: Career, as: 'carrera' }],
         },
+        { model: Career, as: 'carrera' },
       ],
     });
     if (!subject) return res.status(404).json({ message: 'Materia no encontrada' });
@@ -39,14 +55,18 @@ const getById = async (req, res, next) => {
 
 const create = async (req, res, next) => {
   try {
-    const { codigo, nombre, creditos, descripcion, id_pensum, id_pensums } = req.body;
+    const { nombre, creditos, descripcion, id_pensum, id_pensums, id_carrera } = req.body;
     const pensumIds = Array.isArray(id_pensums) ? id_pensums : (id_pensum ? [id_pensum] : []);
+
+    // Auto-generate code
+    const codigo = await generateSubjectCode(nombre || 'MAT');
 
     const subject = await Subject.create({
       codigo,
       nombre,
       creditos: creditos ?? 0,
       descripcion,
+      id_carrera: id_carrera || null,
     });
 
     if (pensumIds.length > 0) {
@@ -67,15 +87,20 @@ const update = async (req, res, next) => {
     const subject = await Subject.findByPk(req.params.id);
     if (!subject) return res.status(404).json({ message: 'Materia no encontrada' });
 
-    const { codigo, nombre, creditos, descripcion, id_pensum, id_pensums } = req.body;
+    const { codigo, nombre, creditos, descripcion, id_pensum, id_pensums, id_carrera } = req.body;
     const pensumIds = Array.isArray(id_pensums) ? id_pensums : (id_pensum ? [id_pensum] : []);
 
     const updateData = {
-      codigo,
       nombre,
       creditos: creditos ?? subject.creditos,
       descripcion,
+      id_carrera: id_carrera !== undefined ? (id_carrera || null) : subject.id_carrera,
     };
+
+    // Only update codigo if explicitly provided (for backwards compatibility)
+    if (codigo !== undefined) {
+      updateData.codigo = codigo;
+    }
 
     await subject.update(updateData);
 

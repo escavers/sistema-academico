@@ -4,6 +4,7 @@ const { verifyToken } = require('../middlewares/auth.middleware');
 const { verifyRole } = require('../middlewares/role.middleware');
 
 // Parameterized paths before /:id to avoid conflicts
+router.get('/available-teachers', verifyToken, courseController.getAvailableTeachers);
 router.get('/teacher/:teacherId', verifyToken, courseController.getByTeacher);
 router.get('/student/:studentId', verifyToken, courseController.getByStudent);
 

@@ -18,6 +18,8 @@ const Schedule = require('./Schedule');
 const Enrollment = require('./Enrollment');
 const Grade = require('./Grade');
 const BlacklistedToken = require('./BlacklistedToken');
+const TeacherCareer = require('./TeacherCareer');
+const TeacherSpecialty = require('./TeacherSpecialty');
 
 // ── Role <-> User ───────────────────────────────────────────────────────────
 Role.hasMany(User, { foreignKey: 'id_rol', as: 'usuarios' });
@@ -71,6 +73,10 @@ SubjectCurriculum.belongsTo(Curriculum, { foreignKey: 'id_pensum', as: 'pensum' 
 Subject.hasMany(SubjectCurriculum, { foreignKey: 'id_materia', as: 'subjectPensums' });
 SubjectCurriculum.belongsTo(Subject, { foreignKey: 'id_materia', as: 'materia' });
 
+// ── Subject -> Career (direct link) ─────────────────────────────────────────
+Subject.belongsTo(Career, { foreignKey: 'id_carrera', as: 'carrera' });
+Career.hasMany(Subject, { foreignKey: 'id_carrera', as: 'materias' });
+
 // ── Subject <-> Course ──────────────────────────────────────────────────────
 Subject.hasMany(Course, { foreignKey: 'id_materia', as: 'cursos' });
 Course.belongsTo(Subject, { foreignKey: 'id_materia', as: 'materia' });
@@ -107,6 +113,29 @@ Grade.belongsTo(Enrollment, { foreignKey: 'id_inscripcion', as: 'inscripcion' })
 Teacher.hasMany(Grade, { foreignKey: 'id_docente', as: 'calificaciones' });
 Grade.belongsTo(Teacher, { foreignKey: 'id_docente', as: 'docente_calificador' });
 
+// ── Teacher <-> Career (many-to-many via docente_carrera) ───────────────────
+Teacher.belongsToMany(Career, {
+  through: TeacherCareer,
+  foreignKey: 'id_docente',
+  otherKey: 'id_carrera',
+  as: 'carreras',
+});
+Career.belongsToMany(Teacher, {
+  through: TeacherCareer,
+  foreignKey: 'id_carrera',
+  otherKey: 'id_docente',
+  as: 'docentes',
+});
+Teacher.hasMany(TeacherCareer, { foreignKey: 'id_docente', as: 'docenteCarreras' });
+TeacherCareer.belongsTo(Teacher, { foreignKey: 'id_docente', as: 'docente' });
+TeacherCareer.belongsTo(Career, { foreignKey: 'id_carrera', as: 'carrera' });
+
+// ── Teacher <-> Specialty ───────────────────────────────────────────────────
+Teacher.hasMany(TeacherSpecialty, { foreignKey: 'id_docente', as: 'especialidades' });
+TeacherSpecialty.belongsTo(Teacher, { foreignKey: 'id_docente', as: 'docente' });
+TeacherSpecialty.belongsTo(Career, { foreignKey: 'id_carrera', as: 'carrera' });
+Career.hasMany(TeacherSpecialty, { foreignKey: 'id_carrera', as: 'docenteEspecialidades' });
+
 module.exports = {
   sequelize,
   Role,
@@ -127,5 +156,6 @@ module.exports = {
   Enrollment,
   Grade,
   BlacklistedToken,
+  TeacherCareer,
+  TeacherSpecialty,
 };
-

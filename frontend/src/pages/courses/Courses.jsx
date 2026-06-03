@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { authApi, coursesApi, enrollmentsApi, subjectsApi, periodsApi, usersApi, careersApi } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
@@ -30,11 +30,14 @@ export default function Courses() {
   // Lists for Admin selections
   const [subjects, setSubjects]     = useState([]);
   const [periods, setPeriods]       = useState([]);
-  const [teachers, setTeachers]     = useState([]);
   const [careers, setCareers]       = useState([]);
   const [selectedCareerId, setSelectedCareerId] = useState('');
   const [enrolling, setEnrolling]   = useState(false);
   const [saving, setSaving]         = useState(false);
+
+  // Available teachers for the selected subject/day/shift
+  const [availableTeachers, setAvailableTeachers] = useState([]);
+  const [loadingTeachers, setLoadingTeachers] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -76,18 +79,21 @@ export default function Courses() {
   const loadAdminHelpers = async () => {
     if (!isAdmin()) return;
     try {
-      const [subRes, perRes, usrRes, careersRes] = await Promise.all([
+      const [subRes, perRes, careersRes] = await Promise.all([
         subjectsApi.getAll(),
         periodsApi.getAll(),
-        usersApi.getAll(),
         careersApi.getAll(),
       ]);
       setSubjects(subRes.data);
-      setPeriods(perRes.data);
+      // Filter periods: only active ones whose date range covers the current date
+      const today = new Date().toISOString().slice(0, 10);
+      const activePeriods = (perRes.data || []).filter(p => 
+        p.estado && p.fecha_inicio <= today && p.fecha_fin >= today
+      );
+      // If no periods match current date, fallback to all active periods
+      setPeriods(activePeriods.length > 0 ? activePeriods : (perRes.data || []).filter(p => p.estado));
       setCareers(careersRes.data);
       setSelectedCareerId(careersRes.data?.[0]?.id ?? '');
-      // Filter users who are Teachers (id_rol === 2)
-      setTeachers(usrRes.data.filter(u => u.id_rol === 2 && u.estado));
     } catch {
       show('Error al cargar listas auxiliares de administración', 'error');
     }
@@ -98,6 +104,7 @@ export default function Courses() {
     loadAdminHelpers();
   }, []);
 
+<<<<<<< HEAD
   const normalizeText = (value) =>
     String(value || '')
       .normalize('NFD')
@@ -113,6 +120,37 @@ export default function Courses() {
     if (hour >= 18 && hour < 24) return 'noche';
     return null;
   };
+=======
+  // Load available teachers when subject, day, or shift changes in the course modal
+  const loadAvailableTeachers = useCallback(async (id_materia, dia_semana, turno) => {
+    if (!id_materia) {
+      setAvailableTeachers([]);
+      return;
+    }
+    setLoadingTeachers(true);
+    try {
+      const turnoData = TURNOS[turno] || TURNOS.manana;
+      const res = await coursesApi.getAvailableTeachers({
+        id_materia,
+        dia_semana: dia_semana || 'Lunes',
+        hora_inicio: turnoData.hora_inicio,
+        hora_fin: turnoData.hora_fin,
+      });
+      setAvailableTeachers(res.data || []);
+    } catch {
+      setAvailableTeachers([]);
+    } finally {
+      setLoadingTeachers(false);
+    }
+  }, []);
+
+  // When course modal form changes, refresh available teachers
+  useEffect(() => {
+    if (!courseModal) return;
+    const { id_materia, dia_semana, turno } = courseModal.form;
+    loadAvailableTeachers(id_materia, dia_semana, turno);
+  }, [courseModal?.form?.id_materia, courseModal?.form?.dia_semana, courseModal?.form?.turno]);
+>>>>>>> f12d037f2e56694cc266489744f963554f61c335
 
   const filtered = courses.filter((c) => {
     const searchable = [c.codigo_grupo, c.materia?.nombre, c.materia?.codigo]
@@ -145,8 +183,8 @@ export default function Courses() {
   };
 
   const openCreateModal = () => {
-    if (subjects.length === 0 || periods.length === 0 || teachers.length === 0) {
-      show('Asegúrate de tener materias, períodos y docentes activos creados primero.', 'warning');
+    if (subjects.length === 0 || periods.length === 0) {
+      show('Asegúrate de tener materias y períodos activos creados primero.', 'warning');
     }
     setCourseModal({
       id: null,
@@ -154,7 +192,7 @@ export default function Courses() {
         codigo_grupo: '',
         id_materia: subjects[0]?.id ?? '',
         id_periodo_academico: periods.find(p => p.estado)?.id ?? periods[0]?.id ?? '',
-        id_docente: teachers[0]?.id ?? '',
+        id_docente: '',
         cupo_maximo: 20,
         estado: true,
         dia_semana: 'Lunes',
@@ -188,8 +226,8 @@ export default function Courses() {
 
   const handleSaveCourse = async (e) => {
     e.preventDefault();
-    if (!courseModal.form.codigo_grupo.trim()) {
-      show('El código de grupo es obligatorio', 'warning');
+    if (!courseModal.form.id_docente) {
+      show('Selecciona un docente asignado para el curso.', 'warning');
       return;
     }
     setSaving(true);
@@ -197,6 +235,7 @@ export default function Courses() {
       const { dia_semana, turno, aula } = courseModal.form;
       if (!aula.trim()) {
         show('La aula es obligatoria para definir el horario del curso.', 'warning');
+        setSaving(false);
         return;
       }
 
@@ -211,12 +250,19 @@ export default function Courses() {
         }],
       };
 
+      // Remove non-DB fields
+      delete payload.dia_semana;
+      delete payload.turno;
+      delete payload.aula;
+
       if (courseModal.id) {
         await coursesApi.update(courseModal.id, payload);
         show('Curso actualizado con éxito ✅', 'success');
       } else {
         // Asignar el administrador creador
         payload.id_administrador = user.id;
+        // codigo_grupo is auto-generated on backend
+        delete payload.codigo_grupo;
         await coursesApi.create(payload);
         show('Nuevo curso creado y programado ✅', 'success');
       }
@@ -238,6 +284,16 @@ export default function Courses() {
     } catch (err) {
       show(err.response?.data?.message || 'Error al eliminar el curso', 'error');
     }
+  };
+
+  /**
+   * Format teacher display: Name (@username) — Specialty
+   */
+  const formatTeacherOption = (teacher) => {
+    const name = `${teacher.usuario?.nombres || ''} ${teacher.usuario?.apellido_paterno || ''}`.trim();
+    const username = teacher.usuario?.nombre_usuario || '';
+    const specialties = (teacher.especialidades || []).map(e => e.especialidad).join(', ');
+    return `${name} (@${username})${specialties ? ` — ${specialties}` : ''}`;
   };
 
   return (
@@ -331,6 +387,11 @@ export default function Courses() {
                 <div className="course-card-meta">
                   <div className="course-card-meta-item">
                     👨‍🏫 <strong>Docente:</strong> {c.docente?.usuario?.nombres ?? 'No asignado'} {c.docente?.usuario?.apellido_paterno ?? ''}
+                    {c.docente?.especialidades?.length > 0 && (
+                      <span className="text-muted" style={{ fontSize: 12, marginLeft: 4 }}>
+                        ({c.docente.especialidades.map(e => e.especialidad).join(', ')})
+                      </span>
+                    )}
                   </div>
                   <div className="course-card-meta-item">
                     📅 <strong>Período:</strong> {c.periodo_academico?.codigo ?? 'Vigente'}
@@ -427,15 +488,15 @@ export default function Courses() {
           }
         >
           <form onSubmit={handleSaveCourse}>
+            {/* Auto-generated code or show existing */}
             <div className="form-group">
-              <label className="form-label">Código de Grupo <span>*</span></label>
-              <input
-                className="form-control"
-                placeholder="Ej: GRUPO-A, INF-01, MAT-10"
-                value={courseModal.form.codigo_grupo}
-                onChange={(e) => setCourseModal(p => ({ ...p, form: { ...p.form, codigo_grupo: e.target.value } }))}
-                required
-              />
+              <label className="form-label">Código de Grupo</label>
+              {courseModal.id ? (
+                <input className="form-control" value={courseModal.form.codigo_grupo} disabled style={{ opacity: 0.7 }} />
+              ) : (
+                <input className="form-control" value="Se generará automáticamente" disabled style={{ opacity: 0.6, fontStyle: 'italic' }} />
+              )}
+              <span className="form-hint">El código se genera automáticamente a partir de la materia.</span>
             </div>
 
             <div className="form-grid">
@@ -444,9 +505,12 @@ export default function Courses() {
                 <select
                   className="form-control"
                   value={courseModal.form.id_materia}
-                  onChange={(e) => setCourseModal(p => ({ ...p, form: { ...p.form, id_materia: parseInt(e.target.value) } }))}
+                  onChange={(e) => {
+                    const newMateria = parseInt(e.target.value);
+                    setCourseModal(p => ({ ...p, form: { ...p.form, id_materia: newMateria, id_docente: '' } }));
+                  }}
                 >
-                  {subjects.map(s => <option key={s.id} value={s.id}>{s.nombre} ({s.codigo})</option>)}
+                  {subjects.map(s => <option key={s.id} value={s.id}>{s.nombre} ({s.codigo}){s.carrera ? ` — ${s.carrera.nombre}` : ''}</option>)}
                 </select>
               </div>
 
@@ -459,32 +523,6 @@ export default function Courses() {
                 >
                   {periods.map(p => <option key={p.id} value={p.id}>{p.codigo} {p.estado && '(Activo)'}</option>)}
                 </select>
-              </div>
-            </div>
-
-            <div className="form-grid">
-              <div className="form-group">
-                <label className="form-label">Docente Asignado</label>
-                <select
-                  className="form-control"
-                  value={courseModal.form.id_docente}
-                  onChange={(e) => setCourseModal(p => ({ ...p, form: { ...p.form, id_docente: parseInt(e.target.value) } }))}
-                >
-                  {teachers.map(t => <option key={t.id} value={t.id}>{t.nombres} {t.apellido_paterno} (@{t.nombre_usuario})</option>)}
-                </select>
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">Cupo Máximo Alumnos</label>
-                <input
-                  className="form-control"
-                  type="number"
-                  min="5"
-                  max="100"
-                  value={courseModal.form.cupo_maximo}
-                  onChange={(e) => setCourseModal(p => ({ ...p, form: { ...p.form, cupo_maximo: e.target.value } }))}
-                  required
-                />
               </div>
             </div>
 
@@ -505,7 +543,7 @@ export default function Courses() {
                 <select
                   className="form-control"
                   value={courseModal.form.turno}
-                  onChange={(e) => setCourseModal(p => ({ ...p, form: { ...p.form, turno: e.target.value } }))}
+                  onChange={(e) => setCourseModal(p => ({ ...p, form: { ...p.form, turno: e.target.value, id_docente: '' } }))}
                 >
                   {Object.entries(TURNOS).map(([key, turno]) => (
                     <option key={key} value={key}>{turno.label}</option>
@@ -515,14 +553,50 @@ export default function Courses() {
             </div>
 
             <div className="form-group">
-              <label className="form-label">Aula</label>
-              <input
+              <label className="form-label">Docente Asignado {loadingTeachers && <span className="spinner" style={{ width: 14, height: 14, borderWidth: 2, marginLeft: 8, display: 'inline-block' }} />}</label>
+              <select
                 className="form-control"
-                placeholder="Ej: A101, LAB-3, B-202"
-                value={courseModal.form.aula}
-                onChange={(e) => setCourseModal(p => ({ ...p, form: { ...p.form, aula: e.target.value } }))}
-                required
-              />
+                value={courseModal.form.id_docente}
+                onChange={(e) => setCourseModal(p => ({ ...p, form: { ...p.form, id_docente: parseInt(e.target.value) } }))}
+                disabled={loadingTeachers}
+              >
+                <option value="">Selecciona un docente...</option>
+                {availableTeachers.map(t => (
+                  <option key={t.id} value={t.id}>{formatTeacherOption(t)}</option>
+                ))}
+              </select>
+              {availableTeachers.length === 0 && !loadingTeachers && courseModal.form.id_materia && (
+                <span className="form-hint" style={{ color: 'var(--warning)' }}>
+                  No hay docentes disponibles para esta materia en el turno y día seleccionados.
+                </span>
+              )}
+              <span className="form-hint">Solo se muestran docentes vinculados a la carrera de la materia y sin conflicto de horario.</span>
+            </div>
+
+            <div className="form-grid">
+              <div className="form-group">
+                <label className="form-label">Cupo Máximo Alumnos</label>
+                <input
+                  className="form-control"
+                  type="number"
+                  min="5"
+                  max="100"
+                  value={courseModal.form.cupo_maximo}
+                  onChange={(e) => setCourseModal(p => ({ ...p, form: { ...p.form, cupo_maximo: e.target.value } }))}
+                  required
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Aula</label>
+                <input
+                  className="form-control"
+                  placeholder="Ej: A101, LAB-3, B-202"
+                  value={courseModal.form.aula}
+                  onChange={(e) => setCourseModal(p => ({ ...p, form: { ...p.form, aula: e.target.value } }))}
+                  required
+                />
+              </div>
             </div>
 
             <div className="form-group">
