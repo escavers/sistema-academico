@@ -1,5 +1,5 @@
 const { Op } = require('sequelize');
-const { Enrollment, Course, Student, User, Schedule, Subject, AcademicPeriod, Teacher, Notification } = require('../models');
+const { Enrollment, Course, Student, User, Schedule, Subject, AcademicPeriod, Teacher, Notification, Grade } = require('../models');
 
 const create = async (req, res, next) => {
   try {
@@ -19,7 +19,7 @@ const create = async (req, res, next) => {
       include: [
         { model: Schedule, as: 'horarios' },
         { model: AcademicPeriod, as: 'periodo_academico' },
-        { model: Subject, as: 'materia' },
+        { model: Subject, as: 'materia', include: [{ model: Subject, as: 'prerequisito' }] },
       ],
     });
     if (!course) return res.status(404).json({ message: 'Curso no encontrado o inactivo' });
@@ -34,6 +34,40 @@ const create = async (req, res, next) => {
     const enrolledCount = await Enrollment.count({ where: { id_curso, estado: 'Inscrito' } });
     if (enrolledCount >= course.cupo_maximo) {
       return res.status(400).json({ message: 'El curso ha alcanzado su cupo máximo' });
+    }
+
+    if (course.materia?.id_prerequisito) {
+      const prereqSubject = course.materia.prerequisito;
+      const passedPrerequisite = await Enrollment.findOne({
+        where: { id_estudiante },
+        include: [
+          {
+            model: Course,
+            as: 'curso',
+            required: true,
+            include: [
+              {
+                model: Subject,
+                as: 'materia',
+                required: true,
+                where: { id: course.materia.id_prerequisito },
+              },
+            ],
+          },
+          {
+            model: Grade,
+            as: 'calificacion',
+            required: true,
+            where: { nota: { [Op.gte]: 51 } },
+          },
+        ],
+      });
+
+      if (!passedPrerequisite) {
+        return res.status(400).json({
+          message: `Para inscribirse en ${course.materia?.nombre}, primero debes aprobar la materia prerequisito ${prereqSubject?.nombre || 'requisito'}.`,
+        });
+      }
     }
 
     if (course.horarios && course.horarios.length > 0) {

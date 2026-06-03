@@ -25,6 +25,7 @@ const getAll = async (req, res, next) => {
           include: [{ model: Career, as: 'carrera', include: [{ model: Modality, as: 'modalidad' }] }],
         },
         { model: Career, as: 'carrera' },
+        { model: Subject, as: 'prerequisito' },
       ],
     });
     res.json(subjects);
@@ -44,6 +45,7 @@ const getById = async (req, res, next) => {
           include: [{ model: Career, as: 'carrera' }],
         },
         { model: Career, as: 'carrera' },
+        { model: Subject, as: 'prerequisito' },
       ],
     });
     if (!subject) return res.status(404).json({ message: 'Materia no encontrada' });
@@ -55,7 +57,7 @@ const getById = async (req, res, next) => {
 
 const create = async (req, res, next) => {
   try {
-    const { nombre, creditos, descripcion, id_pensum, id_pensums, id_carrera } = req.body;
+    const { nombre, creditos, descripcion, id_pensum, id_pensums, id_carrera, id_prerequisito } = req.body;
     const pensumIds = Array.isArray(id_pensums) ? id_pensums : (id_pensum ? [id_pensum] : []);
 
     // Auto-generate code
@@ -67,6 +69,7 @@ const create = async (req, res, next) => {
       creditos: creditos ?? 0,
       descripcion,
       id_carrera: id_carrera || null,
+      id_prerequisito: id_prerequisito || null,
     });
 
     if (pensumIds.length > 0) {
@@ -87,7 +90,7 @@ const update = async (req, res, next) => {
     const subject = await Subject.findByPk(req.params.id);
     if (!subject) return res.status(404).json({ message: 'Materia no encontrada' });
 
-    const { codigo, nombre, creditos, descripcion, id_pensum, id_pensums, id_carrera } = req.body;
+    const { codigo, nombre, creditos, descripcion, id_pensum, id_pensums, id_carrera, id_prerequisito } = req.body;
     const pensumIds = Array.isArray(id_pensums) ? id_pensums : (id_pensum ? [id_pensum] : []);
 
     const updateData = {
@@ -95,6 +98,7 @@ const update = async (req, res, next) => {
       creditos: creditos ?? subject.creditos,
       descripcion,
       id_carrera: id_carrera !== undefined ? (id_carrera || null) : subject.id_carrera,
+      id_prerequisito: id_prerequisito !== undefined ? (id_prerequisito || null) : subject.id_prerequisito,
     };
 
     // Only update codigo if explicitly provided (for backwards compatibility)

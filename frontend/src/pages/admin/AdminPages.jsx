@@ -161,7 +161,7 @@ export function Subjects() {
   const [rows, setRows]   = useState([]);
   const [loading, setLoading] = useState(true);
   const [modal, setModal] = useState(null);
-  const [form, setForm]   = useState({ nombre: '', descripcion: '', id_carrera: '' });
+  const [form, setForm]   = useState({ nombre: '', descripcion: '', id_carrera: '', id_prerequisito: '' });
   const [search, setSearch] = useState('');
   const [careerFilter, setCareerFilter] = useState('');
   const [careers, setCareers] = useState([]);
@@ -203,7 +203,7 @@ export function Subjects() {
         <div className="card-header" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 12 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, width: '100%' }}>
             <div className="card-title">Lista de Materias</div>
-            <button className="btn btn-primary btn-sm" onClick={() => { setForm({ nombre: '', descripcion: '', id_carrera: '' }); setModal({}); }}>+ Nueva Materia</button>
+            <button className="btn btn-primary btn-sm" onClick={() => { setForm({ nombre: '', descripcion: '', id_carrera: '', id_prerequisito: '' }); setModal({}); }}>+ Nueva Materia</button>
           </div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, justifyContent: 'space-between' }}>
             <div className="input-group search-input" style={{ flex: '1 1 320px', minWidth: 240 }}>
@@ -231,16 +231,19 @@ export function Subjects() {
         {loading ? <div className="flex-center" style={{ padding: 40 }}><div className="spinner" /></div>
           : <div className="table-wrapper">
               <table className="table">
-                <thead><tr><th>Código</th><th>Nombre</th><th>Carrera</th><th>Acciones</th></tr></thead>
+                <thead><tr><th>Código</th><th>Nombre</th><th>Carrera</th><th>Prerrequisito</th><th>Acciones</th></tr></thead>
                 <tbody>
                   {filteredRows.length === 0 ? (
-                    <tr><td colSpan={4}><div className="empty-state" style={{ padding: 24 }}><p>No se encontraron materias con esos filtros.</p></div></td></tr>
+                    <tr><td colSpan={5}><div className="empty-state" style={{ padding: 24 }}><p>No se encontraron materias con esos filtros.</p></div></td></tr>
                   ) : filteredRows.map((r) => (
                     <tr key={r.id}>
                       <td><span className="badge badge-info">{r.codigo}</span></td>
                       <td><strong>{r.nombre}</strong></td>
                       <td className="text-sm text-muted">
                         {r.pensums?.map(p => p.carrera?.nombre).filter(Boolean).join(', ') || '—'}
+                      </td>
+                      <td className="text-sm text-muted">
+                        {r.prerequisito?.nombre || '—'}
                       </td>
                       <td><div style={{ display: 'flex', gap: 6 }}>
                         <button className="btn btn-secondary btn-sm" onClick={() => {
@@ -249,6 +252,7 @@ export function Subjects() {
                             nombre: r.nombre,
                             descripcion: r.descripcion ?? '',
                             id_carrera: r.id_carrera || r.carrera?.id || '',
+                            id_prerequisito: r.id_prerequisito || '',
                           });
                           setModal({ id: r.id });
                         }}>✏️</button>
@@ -271,7 +275,7 @@ export function Subjects() {
               <div className="form-group"><label className="form-label">Código</label><input className="form-control" value="Se generará automáticamente" disabled style={{ opacity: 0.6, fontStyle: 'italic' }} /></div>
             )}
             <div className="form-group"><label className="form-label">Carrera <span>*</span></label>
-              <select className="form-control" value={form.id_carrera} onChange={(e) => setForm(p => ({ ...p, id_carrera: e.target.value ? parseInt(e.target.value) : '' }))}>
+              <select className="form-control" value={form.id_carrera} onChange={(e) => setForm(p => ({ ...p, id_carrera: e.target.value ? parseInt(e.target.value) : '', id_prerequisito: '' }))}>
                 <option value="">Selecciona una carrera</option>
                 {careers.map((c) => (
                   <option key={c.id} value={c.id}>{c.nombre}</option>
@@ -280,6 +284,36 @@ export function Subjects() {
             </div>
           </div>
           <div className="form-group"><label className="form-label">Nombre <span>*</span></label><input className="form-control" value={form.nombre} onChange={(e) => setForm(p => ({ ...p, nombre: e.target.value }))} /></div>
+          <div className="form-group" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <label className="form-label" style={{ margin: 0 }}>¿Tiene prerrequisito?</label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, margin: 0 }}>
+              <input
+                type="checkbox"
+                checked={Boolean(form.id_prerequisito)}
+                onChange={(e) => setForm(p => ({
+                  ...p,
+                  id_prerequisito: e.target.checked ? (rows.find((s) => s.id !== modal.id && (!p.id_carrera || s.id_carrera === p.id_carrera))?.id || '') : '',
+                }))}
+              />
+              Activar prerrequisito
+            </label>
+          </div>
+          {Boolean(form.id_prerequisito) && (
+            <div className="form-group"><label className="form-label">Materia prerrequisito</label>
+              <select
+                className="form-control"
+                value={form.id_prerequisito}
+                onChange={(e) => setForm(p => ({ ...p, id_prerequisito: e.target.value ? parseInt(e.target.value) : '' }))}
+              >
+                <option value="">Selecciona una materia</option>
+                {rows
+                  .filter((subject) => subject.id !== modal.id && (!form.id_carrera || subject.id_carrera === form.id_carrera))
+                  .map((subject) => (
+                    <option key={subject.id} value={subject.id}>{subject.codigo} - {subject.nombre}</option>
+                  ))}
+              </select>
+            </div>
+          )}
           <div className="form-group"><label className="form-label">Descripción</label><textarea className="form-control" rows={3} value={form.descripcion} onChange={(e) => setForm(p => ({ ...p, descripcion: e.target.value }))} /></div>
         </Modal>
       )}

@@ -77,6 +77,10 @@ SubjectCurriculum.belongsTo(Subject, { foreignKey: 'id_materia', as: 'materia' }
 Subject.belongsTo(Career, { foreignKey: 'id_carrera', as: 'carrera' });
 Career.hasMany(Subject, { foreignKey: 'id_carrera', as: 'materias' });
 
+// ── Subject -> Prerequisite (self reference) ─────────────────────────────────
+Subject.belongsTo(Subject, { foreignKey: 'id_prerequisito', as: 'prerequisito' });
+Subject.hasMany(Subject, { foreignKey: 'id_prerequisito', as: 'dependientes' });
+
 // ── Subject <-> Course ──────────────────────────────────────────────────────
 Subject.hasMany(Course, { foreignKey: 'id_materia', as: 'cursos' });
 Course.belongsTo(Subject, { foreignKey: 'id_materia', as: 'materia' });

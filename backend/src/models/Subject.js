@@ -31,6 +31,13 @@ const Subject = sequelize.define('Subject', {
     onUpdate: 'CASCADE',
     onDelete: 'SET NULL',
   },
+  id_prerequisito: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    references: { model: 'materia', key: 'id' },
+    onUpdate: 'CASCADE',
+    onDelete: 'SET NULL',
+  },
 }, {
   tableName: 'materia',
   timestamps: false,

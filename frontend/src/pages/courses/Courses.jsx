@@ -104,7 +104,6 @@ export default function Courses() {
     loadAdminHelpers();
   }, []);
 
-<<<<<<< HEAD
   const normalizeText = (value) =>
     String(value || '')
       .normalize('NFD')
@@ -120,7 +119,7 @@ export default function Courses() {
     if (hour >= 18 && hour < 24) return 'noche';
     return null;
   };
-=======
+
   // Load available teachers when subject, day, or shift changes in the course modal
   const loadAvailableTeachers = useCallback(async (id_materia, dia_semana, turno) => {
     if (!id_materia) {
@@ -150,7 +149,6 @@ export default function Courses() {
     const { id_materia, dia_semana, turno } = courseModal.form;
     loadAvailableTeachers(id_materia, dia_semana, turno);
   }, [courseModal?.form?.id_materia, courseModal?.form?.dia_semana, courseModal?.form?.turno]);
->>>>>>> f12d037f2e56694cc266489744f963554f61c335
 
   const filtered = courses.filter((c) => {
     const searchable = [c.codigo_grupo, c.materia?.nombre, c.materia?.codigo]
