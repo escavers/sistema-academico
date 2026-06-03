@@ -196,6 +196,17 @@ export function Subjects() {
     return matchesSearch && matchesCareer;
   });
 
+  const ITEMS_PER_PAGE = 10;
+  const [currentPage, setCurrentPage] = useState(1);
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, careerFilter]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredRows.length / ITEMS_PER_PAGE));
+  const paginatedRows = filteredRows.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
+
   return (
     <>
       <div className="page-header"><h1>Materias</h1><p>Catálogo de materias del sistema</p></div>
@@ -229,39 +240,69 @@ export function Subjects() {
           </div>
         </div>
         {loading ? <div className="flex-center" style={{ padding: 40 }}><div className="spinner" /></div>
-          : <div className="table-wrapper">
-              <table className="table">
-                <thead><tr><th>Código</th><th>Nombre</th><th>Carrera</th><th>Prerrequisito</th><th>Acciones</th></tr></thead>
-                <tbody>
-                  {filteredRows.length === 0 ? (
-                    <tr><td colSpan={5}><div className="empty-state" style={{ padding: 24 }}><p>No se encontraron materias con esos filtros.</p></div></td></tr>
-                  ) : filteredRows.map((r) => (
-                    <tr key={r.id}>
-                      <td><span className="badge badge-info">{r.codigo}</span></td>
-                      <td><strong>{r.nombre}</strong></td>
-                      <td className="text-sm text-muted">
-                        {r.pensums?.map(p => p.carrera?.nombre).filter(Boolean).join(', ') || '—'}
-                      </td>
-                      <td className="text-sm text-muted">
-                        {r.prerequisito?.nombre || '—'}
-                      </td>
-                      <td><div style={{ display: 'flex', gap: 6 }}>
-                        <button className="btn btn-secondary btn-sm" onClick={() => {
-                          setForm({
-                            codigo: r.codigo,
-                            nombre: r.nombre,
-                            descripcion: r.descripcion ?? '',
-                            id_carrera: r.id_carrera || r.carrera?.id || '',
-                            id_prerequisito: r.id_prerequisito || '',
-                          });
-                          setModal({ id: r.id });
-                        }}>✏️</button>
-                        <button className="btn btn-danger btn-sm" onClick={() => del(r.id)}>🗑️</button>
-                      </div></td>
-                    </tr>
+          : <div>
+              <div className="table-wrapper">
+                <table className="table">
+                  <thead><tr><th>Código</th><th>Nombre</th><th>Carrera</th><th>Prerrequisito</th><th>Acciones</th></tr></thead>
+                  <tbody>
+                    {paginatedRows.length === 0 ? (
+                      <tr><td colSpan={5}><div className="empty-state" style={{ padding: 24 }}><p>No se encontraron materias con esos filtros.</p></div></td></tr>
+                    ) : paginatedRows.map((r) => (
+                      <tr key={r.id}>
+                        <td><span className="badge badge-info">{r.codigo}</span></td>
+                        <td><strong>{r.nombre}</strong></td>
+                        <td className="text-sm text-muted">
+                          {r.pensums?.map(p => p.carrera?.nombre).filter(Boolean).join(', ') || '—'}
+                        </td>
+                        <td className="text-sm text-muted">
+                          {r.prerequisito?.nombre || '—'}
+                        </td>
+                        <td><div style={{ display: 'flex', gap: 6 }}>
+                          <button className="btn btn-secondary btn-sm" onClick={() => {
+                            setForm({
+                              codigo: r.codigo,
+                              nombre: r.nombre,
+                              descripcion: r.descripcion ?? '',
+                              id_carrera: r.id_carrera || r.carrera?.id || '',
+                              id_prerequisito: r.id_prerequisito || '',
+                            });
+                            setModal({ id: r.id });
+                          }}>✏️</button>
+                          <button className="btn btn-danger btn-sm" onClick={() => del(r.id)}>🗑️</button>
+                        </div></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {totalPages > 1 && (
+                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 6, margin: '16px 0', flexWrap: 'wrap' }}>
+                  <button
+                    className="btn btn-secondary btn-sm"
+                    disabled={currentPage === 1}
+                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                  >
+                    ← Anterior
+                  </button>
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                    <button
+                      key={page}
+                      className={`btn btn-sm ${page === currentPage ? 'btn-primary' : 'btn-secondary'}`}
+                      onClick={() => setCurrentPage(page)}
+                      style={{ minWidth: 36 }}
+                    >
+                      {page}
+                    </button>
                   ))}
-                </tbody>
-              </table>
+                  <button
+                    className="btn btn-secondary btn-sm"
+                    disabled={currentPage === totalPages}
+                    onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                  >
+                    Siguiente →
+                  </button>
+                </div>
+              )}
             </div>}
       </div>
 

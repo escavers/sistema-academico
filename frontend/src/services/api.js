@@ -107,7 +107,7 @@ export const modalitiesApi = {
 
 // ── Subjects ──────────────────────────────────
 export const subjectsApi = {
-  getAll:  ()         => api.get('/subjects'),
+  getAll:  (params)   => api.get('/subjects', { params }),
   getById: (id)       => api.get(`/subjects/${id}`),
   create:  (data)     => api.post('/subjects', data),
   update:  (id, data) => api.put(`/subjects/${id}`, data),

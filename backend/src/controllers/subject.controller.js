@@ -16,18 +16,40 @@ const generateSubjectCode = async (nombre) => {
 
 const getAll = async (req, res, next) => {
   try {
-    const subjects = await Subject.findAll({
-      include: [
-        {
-          model: Curriculum,
-          as: 'pensums',
-          through: { attributes: ['semestre'] },
-          include: [{ model: Career, as: 'carrera', include: [{ model: Modality, as: 'modalidad' }] }],
-        },
-        { model: Career, as: 'carrera' },
-        { model: Subject, as: 'prerequisito' },
-      ],
-    });
+    const isPaginated = req.query.page || req.query.limit;
+
+    const includeOptions = [
+      {
+        model: Curriculum,
+        as: 'pensums',
+        through: { attributes: ['semestre'] },
+        include: [{ model: Career, as: 'carrera', include: [{ model: Modality, as: 'modalidad' }] }],
+      },
+      { model: Career, as: 'carrera' },
+      { model: Subject, as: 'prerequisito' },
+    ];
+
+    if (isPaginated) {
+      const page = parseInt(req.query.page) || 1;
+      const limit = parseInt(req.query.limit) || 10;
+      const offset = (page - 1) * limit;
+
+      const { count, rows } = await Subject.findAndCountAll({
+        limit,
+        offset,
+        distinct: true,
+        include: includeOptions,
+      });
+
+      return res.json({
+        data: rows,
+        total: count,
+        page,
+        totalPages: Math.ceil(count / limit),
+      });
+    }
+
+    const subjects = await Subject.findAll({ include: includeOptions });
     res.json(subjects);
   } catch (error) {
     next(error);
