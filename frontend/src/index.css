@@ -527,6 +527,28 @@ select.form-control option { background: var(--bg-card); }
   position: relative;
   overflow: hidden;
 }
+.auth-theme-toggle {
+  position: absolute;
+  top: 22px;
+  right: 22px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 600;
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.2s ease, background 0.2s ease, border-color 0.2s ease;
+}
+.auth-theme-toggle:hover {
+  transform: translateY(-1px);
+  background: var(--bg-card);
+}
 .auth-page::before {
   content: '';
   position: absolute; top: -30%; left: -20%;
@@ -886,12 +908,11 @@ select.form-control option { background: var(--bg-card); }
 
 /* Custom premium aesthetic additions */
 .auth-box {
-  background: rgba(22, 22, 39, 0.6) !important;
-  backdrop-filter: blur(20px);
-  border: 1px solid var(--border);
+  background: var(--bg-card);
+  border: 1px solid rgba(148, 163, 184, 0.15);
   padding: 40px;
   border-radius: var(--radius-xl);
-  box-shadow: var(--shadow-lg);
+  box-shadow: 0 30px 80px rgba(15, 23, 42, 0.08);
 }
 
 .empty-state {

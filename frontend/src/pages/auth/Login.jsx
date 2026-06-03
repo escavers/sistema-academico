@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { authApi } from '../../services/api';
@@ -26,9 +26,17 @@ export default function Login() {
   const [error, setError]     = useState('');
   const [loading, setLoading] = useState(false);
   const [showPwd, setShowPwd] = useState(false);
+  const [theme, setTheme]     = useState(() => localStorage.getItem('theme') || 'dark');
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+    localStorage.setItem('theme', theme);
+  }, [theme]);
 
   const handleChange = (e) =>
     setForm((p) => ({ ...p, [e.target.name]: e.target.value }));
+
+  const toggleTheme = () => setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -47,6 +55,14 @@ export default function Login() {
 
   return (
     <div className="auth-page">
+      <button
+        type="button"
+        className="auth-theme-toggle"
+        onClick={toggleTheme}
+        title={theme === 'dark' ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
+      >
+        {theme === 'dark' ? '☀️ Claro' : '🌙 Oscuro'}
+      </button>
       <div className="auth-panel">
         <div className="auth-box">
           <div className="auth-logo">
@@ -121,7 +137,7 @@ export default function Login() {
           </form>
 
           <div className="auth-footer" style={{ marginTop: 32, fontSize: '12px', color: 'var(--text-muted)' }}>
-            ℹ️ Si eres un nuevo docente o estudiante y no tienes cuenta, ponte en contacto con el <strong>Administrador del Sistema</strong>.
+            ℹ️ Si no tienes acceso, contacta con el <strong>Administrador del Sistema</strong> para obtener tus credenciales.
           </div>
         </div>
       </div>
@@ -131,10 +147,10 @@ export default function Login() {
         <div style={{ textAlign: 'center', maxWidth: 440 }}>
           <div style={{ fontSize: 90, marginBottom: 16, animation: 'spin 15s linear infinite' }}>🎓</div>
           <h2 style={{ fontSize: 32, fontWeight: 800, marginBottom: 16, lineHeight: 1.2 }}>
-            SaaS Académico de Alta Fidelidad
+            Gestión Académica Integral
           </h2>
           <p style={{ color: 'var(--text-secondary)', lineHeight: 1.8, fontSize: '15px' }}>
-            Gestiona asignaturas, coordina horarios, controla inscripciones y visualiza reportes consolidados en tiempo real con una interfaz moderna y fluida.
+            Accede al sistema para administrar cursos, inscripciones y resultados con seguridad, control y transparencia.
           </p>
           <div style={{ display: 'flex', gap: 10, justifyContent: 'center', marginTop: 36, flexWrap: 'wrap' }}>
             {['👨‍💼 Administrativo', '👨‍🏫 Docentes', '🎒 Alumnos', '📊 Estadísticas'].map((tag) => (

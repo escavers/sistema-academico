@@ -40,6 +40,7 @@ export default function Reports() {
 
   /* Teacher: grades by course */
   const [courseIdT, setCourseIdT]   = useState('');
+  const [courseIdE, setCourseIdE]   = useState('');
   const [gradesByCourse, setGradesByCourse]   = useState(null);
   const [enrolledStudents, setEnrolledStudents] = useState(null);
   const [teacherSubjects, setTeacherSubjects] = useState(null);
@@ -105,9 +106,9 @@ export default function Reports() {
   };
 
   const fetchEnrolledStudents = async () => {
-    if (!courseIdT.trim()) { show('Ingresa el ID del curso para filtrar', 'warning'); return; }
+    if (!courseIdE.trim()) { show('Ingresa el ID del curso para filtrar', 'warning'); return; }
     try {
-      const r = await reportsApi.enrolledByCourse(courseIdT);
+      const r = await reportsApi.enrolledByCourse(courseIdE);
       setEnrolledStudents(r.data);
     } catch {
       show('Error al consultar alumnos inscritos', 'error');
@@ -426,10 +427,10 @@ export default function Reports() {
               enrolledStudents && (
                 <>
                   <span style={{ fontWeight: 600, color: 'var(--text-primary)', marginRight: 10 }}>Exportar en:</span>
-                  <button className="btn btn-success btn-sm" style={{ minWidth: 140 }} aria-label="Exportar lista de inscritos a Excel" onClick={() => handleDownload(`/reports/enrolled-students/${courseIdT}`, `alumnos_inscritos_${courseIdT}`, 'excel')}>
+                  <button className="btn btn-success btn-sm" style={{ minWidth: 140 }} aria-label="Exportar lista de inscritos a Excel" onClick={() => handleDownload(`/reports/enrolled-students/${courseIdE}`, `alumnos_inscritos_${courseIdE}`, 'excel')}>
                     📤 Excel
                   </button>
-                  <button className="btn btn-danger btn-sm" style={{ minWidth: 140 }} aria-label="Exportar lista de inscritos a PDF" onClick={() => handleDownload(`/reports/enrolled-students/${courseIdT}`, `alumnos_inscritos_${courseIdT}`, 'pdf')}>
+                  <button className="btn btn-danger btn-sm" style={{ minWidth: 140 }} aria-label="Exportar lista de inscritos a PDF" onClick={() => handleDownload(`/reports/enrolled-students/${courseIdE}`, `alumnos_inscritos_${courseIdE}`, 'pdf')}>
                     📤 PDF
                   </button>
                 </>
@@ -437,7 +438,7 @@ export default function Reports() {
             }
           >
             <div className="search-bar" style={{ marginBottom: 20, display: 'flex', gap: 8 }}>
-              <select className="form-control" value={courseIdT} onChange={(e) => setCourseIdT(e.target.value)}>
+              <select className="form-control" value={courseIdE} onChange={(e) => setCourseIdE(e.target.value)}>
                 <option value="">Selecciona curso...</option>
                 {teacherCourses.map(c => (
                   <option key={c.id} value={c.id}>{c.codigo_grupo} — {c.materia?.nombre ?? c.nombre}</option>

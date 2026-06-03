@@ -14,6 +14,8 @@ export default function Courses() {
   const [loading, setLoading]             = useState(true);
   const [search, setSearch]               = useState('');
   const [turnoFilter, setTurnoFilter]     = useState('');
+  const [currentPage, setCurrentPage]     = useState(1);
+  const STUDENT_PAGE_SIZE = 7;
   
   const TURNOS = {
     manana: { label: 'Mañana', hora_inicio: '08:00', hora_fin: '12:00' },
@@ -165,6 +167,23 @@ export default function Courses() {
 
     return c.materia?.pensums?.some((pensum) => pensum.carrera?.id === Number(selectedCareerId));
   });
+
+  const pageCount = (isStudent() || isAdmin()) ? Math.max(1, Math.ceil(filtered.length / STUDENT_PAGE_SIZE)) : 1;
+  const paginatedCourses = (isStudent() || isAdmin())
+    ? filtered.slice((currentPage - 1) * STUDENT_PAGE_SIZE, currentPage * STUDENT_PAGE_SIZE)
+    : filtered;
+
+  useEffect(() => {
+    if (!(isStudent() || isAdmin())) return;
+    setCurrentPage(1);
+  }, [search, turnoFilter, filtered.length, isStudent(), isAdmin()]);
+
+  useEffect(() => {
+    if (!(isStudent() || isAdmin())) return;
+    if (currentPage > pageCount) {
+      setCurrentPage(pageCount);
+    }
+  }, [currentPage, pageCount, isStudent(), isAdmin()]);
 
   const handleEnroll = async (courseId) => {
     setEnrolling(true);
@@ -374,22 +393,18 @@ export default function Courses() {
           <p>No se encontraron programaciones de cursos vigentes.</p>
         </div>
       ) : (
-        <div className="grid-auto">
-          {filtered.map((c) => (
-            <div key={c.id} className="course-card">
-              <div className="course-card-banner" />
-              <div className="course-card-body">
-                <div className="course-card-code">{c.materia?.codigo ?? 'COD-X'}</div>
-                <div className="course-card-title">{c.materia?.nombre ?? 'Curso sin nombre'}</div>
-                
-                <div className="course-card-meta">
+        <>
+          <div className="grid-auto">
+            {paginatedCourses.map((c) => (
+              <div key={c.id} className="course-card">
+                <div className="course-card-banner" />
+                <div className="course-card-body">
+                  <div className="course-card-code">{c.materia?.codigo ?? 'COD-X'}</div>
+                  <div className="course-card-title">{c.materia?.nombre ?? 'Curso sin nombre'}</div>
+                  
+                  <div className="course-card-meta">
                   <div className="course-card-meta-item">
                     👨‍🏫 <strong>Docente:</strong> {c.docente?.usuario?.nombres ?? 'No asignado'} {c.docente?.usuario?.apellido_paterno ?? ''}
-                    {c.docente?.especialidades?.length > 0 && (
-                      <span className="text-muted" style={{ fontSize: 12, marginLeft: 4 }}>
-                        ({c.docente.especialidades.map(e => e.especialidad).join(', ')})
-                      </span>
-                    )}
                   </div>
                   <div className="course-card-meta-item">
                     📅 <strong>Período:</strong> {c.periodo_academico?.codigo ?? 'Vigente'}
@@ -443,6 +458,37 @@ export default function Courses() {
             </div>
           ))}
         </div>
+
+        {isStudent() && pageCount > 1 && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, justifyContent: 'center', alignItems: 'center', marginTop: 20 }}>
+            <button
+              className="btn btn-secondary btn-sm"
+              disabled={currentPage === 1}
+              onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+            >
+              ‹ Anterior
+            </button>
+
+            {Array.from({ length: pageCount }, (_, index) => (
+              <button
+                key={index + 1}
+                className={`btn btn-sm ${currentPage === index + 1 ? 'btn-primary' : 'btn-secondary'}`}
+                onClick={() => setCurrentPage(index + 1)}
+              >
+                {index + 1}
+              </button>
+            ))}
+
+            <button
+              className="btn btn-secondary btn-sm"
+              disabled={currentPage === pageCount}
+              onClick={() => setCurrentPage((prev) => Math.min(pageCount, prev + 1))}
+            >
+              Siguiente ›
+            </button>
+          </div>
+        )}
+      </>
       )}
 
       {/* Student Enrollment Modal */}
